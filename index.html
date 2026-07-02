@@ -674,8 +674,10 @@ function initEntryForm() {
     if (currentVal) processSelect.value = currentVal;
   }
   
-  // Set default date
-  form.querySelector('[name="discoverTime"]').value = new Date().toISOString().split('T')[0];
+  // Set default date (use local time, not UTC)
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  form.querySelector('[name="discoverTime"]').value = today;
 }
 
 async function saveRecord(event) {
