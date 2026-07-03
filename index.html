@@ -313,6 +313,7 @@ let config = {
   processes: ['包纸', '刮模', '打包', '搅拌', '成型', '烘烤', '冷却']
 };
 let currentPage = 1, pageSize = 15;
+let selectedIds = new Set();
 let charts = {};
 let currentImages = [];
 let filterMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
@@ -1461,6 +1462,8 @@ function batchDelete() {
         await deleteRecordFromDB(id);
       }
       selectedIds.clear();
+      document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('selectAllCheckbox').checked = false;
       document.getElementById('batchActions').style.display = 'none';
       await loadData();
       populateMonthFilters();
@@ -1477,6 +1480,8 @@ function confirmDeleteRecord(id) {
     try {
       await deleteRecordFromDB(id);
       selectedIds.clear();
+      document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('selectAllCheckbox').checked = false;
       document.getElementById('batchActions').style.display = 'none';
       await loadData();
       populateMonthFilters();
