@@ -313,7 +313,6 @@ let config = {
   processes: ['包纸', '刮模', '打包', '搅拌', '成型', '烘烤', '冷却']
 };
 let currentPage = 1, pageSize = 15;
-let selectedIds = new Set();
 let charts = {};
 let currentImages = [];
 let filterMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
@@ -1461,7 +1460,6 @@ function batchDelete() {
       for (const id of ids) {
         await deleteRecordFromDB(id);
       }
-      selectedIds.clear();
       document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
       document.getElementById('selectAllCheckbox').checked = false;
       document.getElementById('batchActions').style.display = 'none';
@@ -1479,7 +1477,6 @@ function confirmDeleteRecord(id) {
   showConfirm('删除确认', '确定要删除这条记录吗？此操作不可恢复！', async () => {
     try {
       await deleteRecordFromDB(id);
-      selectedIds.clear();
       document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
       document.getElementById('selectAllCheckbox').checked = false;
       document.getElementById('batchActions').style.display = 'none';
