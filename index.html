@@ -92,6 +92,14 @@ tr:hover{background:#f8fafc}
 .detail-images{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:8px}
 .detail-images img{width:100%;border-radius:var(--radius-sm);cursor:pointer;transition:transform .2s;aspect-ratio:1;object-fit:cover}
 .detail-images img:hover{transform:scale(1.05)}
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}.confirm-overlay.show{display:flex}
+.confirm-box{background:#fff;border-radius:12px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.confirm-box h4{font-size:16px;margin-bottom:12px;color:#1e293b}
+.confirm-box p{font-size:14px;color:#64748b;margin-bottom:16px}
+.confirm-box input{width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;margin-bottom:12px}
+.confirm-box input:focus{border-color:#2563eb}
+.confirm-box .confirm-btns{display:flex;gap:8px;justify-content:flex-end}
+.confirm-box .confirm-hint{font-size:12px;color:#94a3b8;margin-bottom:12px}
 .img-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:none;align-items:center;justify-content:center;cursor:pointer}
 .img-lightbox img{max-width:90vw;max-height:90vh;border-radius:8px}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
@@ -189,7 +197,7 @@ tr:hover{background:#f8fafc}
 <select class="form-select" id="filterStatus" onchange="renderRecords()" style="padding:7px 10px;font-size:13px"><option value="">全部状态</option><option value="待处理">待处理</option><option value="已处理">已处理</option><option value="已关闭">已关闭</option></select>
 </div>
 </div>
-<div id="batchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="selectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAll()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAll()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑️ 批量删除</button></div></div></div><div class="table-wrapper"><table id="recordsTable"><thead><tr><th><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" style="cursor:pointer"></th><th>序号</th><th>产品名称</th><th>批号</th><th>车间</th><th>工序</th><th>发现时间</th><th>异物类型</th><th>发现人</th><th>风险等级</th><th>处理状态</th><th>责任人</th><th>图片</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+<div id="batchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="selectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAll()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAll()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑️ 批量删除</button></div></div></div><div class="table-wrapper"><table id="recordsTable"><thead><tr><th style="width:36px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" style="cursor:pointer"></th><th>序号</th><th>产品名称</th><th>批号</th><th>车间</th><th>工序</th><th>发现时间</th><th>异物类型</th><th>发现人</th><th>风险等级</th><th>处理状态</th><th>责任人</th><th>异物描述</th><th>图片</th><th>操作</th></tr></thead><tbody></tbody></table></div>
 <div class="pagination" id="recordsPagination"></div>
 <div style="text-align:right;margin-top:8px;font-size:12px;color:var(--text2)" id="recordsCount"></div>
 </div></div>
@@ -215,6 +223,7 @@ tr:hover{background:#f8fafc}
 <div class="charts-grid"><div class="card" style="grid-column:1/-1"><div class="card-header"><span class="card-title">月度发现趋势</span></div><div class="chart-container"><canvas id="chartTimeLine"></canvas></div></div></div>
 <div class="charts-grid"><div class="card"><div class="card-header"><span class="card-title">季度统计</span></div><div class="chart-container"><canvas id="chartTimeQuarter"></canvas></div></div><div class="card"><div class="card-header"><span class="card-title">同比分析</span></div><div class="chart-container"><canvas id="chartTimeYoY"></canvas></div></div></div>
 <div class="card"><div class="card-header"><span class="card-title">月度明细表</span></div><div class="table-wrapper"><table id="timeMonthTable"></table></div></div>
+<div class="card"><div class="card-header"><span class="card-title">📅 周统计（周五至次周四）</span></div><div class="stats-grid" id="weekStats"></div><div class="table-wrapper"><table id="weekDetailTable"></table></div></div>
 </div>
 
 <div class="page" id="page-analysis-product">
@@ -229,6 +238,7 @@ tr:hover{background:#f8fafc}
 <div class="stats-grid" id="personStats"></div>
 <div class="charts-grid"><div class="card"><div class="card-header"><span class="card-title">发现人排名</span></div><div class="chart-container"><canvas id="chartPersonBar"></canvas></div></div><div class="card"><div class="card-header"><span class="card-title">发现人占比</span></div><div class="chart-container"><canvas id="chartPersonPie"></canvas></div></div></div>
 <div class="card"><div class="card-header"><span class="card-title">发现人×月份统计</span></div><div class="table-wrapper"><table id="personMonthTable"></table></div></div>
+<div class="card"><div class="card-header"><span class="card-title">🏆 发现人排名（含异物类型明细）</span></div><div class="table-wrapper"><table id="personRankTable"></table></div></div>
 </div>
 
 <div class="page" id="page-analysis-risk">
@@ -256,7 +266,7 @@ tr:hover{background:#f8fafc}
 <div style="display:flex;gap:8px;margin-bottom:12px"><input class="form-input" id="newProcessName" placeholder="输入工序名称" style="max-width:240px"><button class="btn btn-primary" onclick="addProcess()">添加</button></div>
 <div class="config-list" id="processList2"></div></div>
 <div class="card"><div class="card-header"><span class="card-title">⚠️ 危险操作</span></div>
-<div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-danger" onclick="if(confirm('确定要清空所有记录吗？此操作不可恢复！'))clearAllRecords()">🗑️ 清空所有记录</button><button class="btn btn-outline" onclick="if(confirm('确定要恢复默认配置吗？'))resetConfig()">↩️ 恢复默认配置</button></div></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-danger" onclick="showConfirm('清空确认','确定要清空所有记录吗？此操作不可恢复！',clearAllRecords)">🗑️ 清空所有记录</button><button class="btn btn-outline" onclick="showConfirm('恢复确认','确定要恢复默认配置吗？',resetConfig)">↩️ 恢复默认配置</button></div></div>
 </div>
 
 <!-- Import/Export -->
@@ -281,6 +291,7 @@ tr:hover{background:#f8fafc}
 <!-- Image Lightbox -->
 <div class="img-lightbox" id="imgLightbox" onclick="this.style.display='none'"><img id="lightboxImg" src=""></div>
 
+<div class="confirm-overlay" id="confirmOverlay"><div class="confirm-box"><h4 id="confirmTitle">确认操作</h4><p id="confirmDesc">此操作不可恢复</p><div class="confirm-hint">请输入"我同意此操作"以确认</div><input type="text" id="confirmInput" placeholder="我同意此操作" autocomplete="off"><div class="confirm-btns"><button class="btn btn-outline" onclick="closeConfirm()">取消</button><button class="btn btn-danger" id="confirmOkBtn" onclick="doConfirm()">确认</button></div></div></div>
 <div class="toast-container" id="toastContainer"></div>
 
 
@@ -792,13 +803,15 @@ function renderRecords() {
   
   let html = '';
   pageData.forEach((r, i) => {
-    html += '<tr><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + '</td>' +
+    const desc = r.description ? (r.description.length > 15 ? r.description.substring(0, 15) + '...' : r.description) : '-';
+    html += '<tr><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td>' +
       '<td>' + (r.responsible || '-') + '</td>' +
+      '<td title="' + (r.description || '').replace(/"/g, '&quot;') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + desc + '</td>' +
       '<td>' + (r.images && r.images.length > 0 ? '📷' + r.images.length : '-') + '</td>' +
-      '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord(' + r.id + ')">删除</button></td></tr>';
+      '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(' + r.id + ')">删除</button></td></tr>';
   });
   document.querySelector('#recordsTable tbody').innerHTML = html;
   document.getElementById('recordsCount').textContent = '共 ' + total + ' 条记录';
@@ -886,18 +899,7 @@ function editRecord(id) {
   document.getElementById('submitBtn').textContent = '💾 更新记录';
 }
 
-async function deleteRecord(id) {
-  if (!confirm('确定要删除这条记录吗？')) return;
-  
-  try {
-    await deleteRecordFromDB(id);
-    await loadData();
-    toast('删除成功');
-    renderRecords();
-  } catch (err) {
-    toast('删除失败: ' + err.message, 'error');
-  }
-}
+// deleteRecord replaced by confirmDeleteRecord (see batch actions section)
 
 function showLightbox(src) {
   document.getElementById('lightboxImg').src = src;
@@ -1112,16 +1114,35 @@ function filterByMonth(data, month) {
   return data.filter(r => r.discoverTime && r.discoverTime.startsWith(month));
 }
 
+function syncAllMonthFilters() {
+  const allPrefixes = ['Dashboard', 'Type', 'Workshop', 'Time', 'Product', 'Person', 'Risk'];
+  allPrefixes.forEach(prefix => {
+    const sel = document.getElementById('filterMonth' + prefix);
+    if (sel) sel.value = filterMonth;
+    const hint = document.getElementById('filterMonth' + prefix + 'Hint');
+    if (hint) hint.textContent = filterMonth ? '当前：' + filterMonth : '当前：全部月份';
+  });
+}
+
 function onDashboardMonthChange() {
   filterMonth = document.getElementById('filterMonthDashboard').value;
-  document.getElementById('filterMonthDashboardHint').textContent = filterMonth ? '当前：' + filterMonth : '当前：全部月份';
+  syncAllMonthFilters();
   renderDashboard();
 }
 
 function onAnalysisMonthChange(type) {
   filterMonth = document.getElementById('filterMonth' + type.charAt(0).toUpperCase() + type.slice(1)).value;
-  document.getElementById('filterMonth' + type.charAt(0).toUpperCase() + type.slice(1) + 'Hint').textContent = filterMonth ? '当前：' + filterMonth : '当前：全部月份';
-  renderAnalysis(type);
+  syncAllMonthFilters();
+  // Re-render all analysis pages that are currently visible
+  const activePage = document.querySelector('.page.active');
+  if (activePage) {
+    const pageId = activePage.id.replace('page-', '');
+    if (pageId.startsWith('analysis-')) {
+      renderAnalysis(pageId.replace('analysis-', ''));
+    } else if (pageId === 'dashboard') {
+      renderDashboard();
+    }
+  }
 }
 
 // ============ CONFIG ============
@@ -1196,6 +1217,7 @@ async function removeConfig(key, item) {
 }
 
 async function clearAllRecords() {
+  showConfirm('清空确认', '确定要清空所有记录吗？此操作不可恢复！', async () => {
   try {
     await sbClient.from('records').delete().neq('id', 0);
     records = [];
@@ -1204,6 +1226,7 @@ async function clearAllRecords() {
   } catch (err) {
     toast('清空失败: ' + err.message, 'error');
   }
+  });
 }
 
 async function resetConfig() {
@@ -1245,6 +1268,7 @@ function downloadBlob(blob, name) {
 async function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
+  showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据到现有记录，是否继续？', async () => {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
@@ -1268,11 +1292,13 @@ async function importJSON(e) {
     }
   };
   reader.readAsText(file);
+  });
 }
 
 async function importCSV(e) {
   const file = e.target.files[0];
   if (!file) return;
+  showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据到现有记录，是否继续？', async () => {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
@@ -1314,6 +1340,7 @@ async function importCSV(e) {
     }
   };
   reader.readAsText(file, 'utf-8');
+  });
 }
 
 function parseCSVLine(line) {
@@ -1333,6 +1360,191 @@ function parseCSVLine(line) {
   }
   r.push(c);
   return r;
+}
+
+
+// ============ CONFIRM DIALOG ============
+let confirmCallback = null;
+
+function showConfirm(title, desc, callback) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmDesc').textContent = desc;
+  document.getElementById('confirmInput').value = '';
+  confirmCallback = callback;
+  document.getElementById('confirmOverlay').classList.add('show');
+  document.getElementById('confirmInput').focus();
+}
+
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('show');
+  confirmCallback = null;
+}
+
+function doConfirm() {
+  const input = document.getElementById('confirmInput').value.trim();
+  if (input === '我同意此操作') {
+    closeConfirm();
+    if (confirmCallback) confirmCallback();
+  } else {
+    document.getElementById('confirmInput').style.borderColor = '#dc2626';
+    document.getElementById('confirmInput').placeholder = '请输入"我同意此操作"';
+    setTimeout(() => {
+      document.getElementById('confirmInput').style.borderColor = '#e2e8f0';
+    }, 1500);
+  }
+}
+
+// ============ BATCH ACTIONS ============
+function toggleSelectAll() {
+  const checked = document.getElementById('selectAllCheckbox').checked;
+  document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = checked);
+  updateBatchActions();
+}
+
+function updateBatchActions() {
+  const checked = document.querySelectorAll('.record-checkbox:checked');
+  const bar = document.getElementById('batchActions');
+  document.getElementById('selectedCount').textContent = checked.length;
+  bar.style.display = checked.length > 0 ? 'block' : 'none';
+  const all = document.querySelectorAll('.record-checkbox');
+  document.getElementById('selectAllCheckbox').checked = all.length > 0 && checked.length === all.length;
+}
+
+function selectAll() {
+  document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = true);
+  document.getElementById('selectAllCheckbox').checked = true;
+  updateBatchActions();
+}
+
+function deselectAll() {
+  document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
+  document.getElementById('selectAllCheckbox').checked = false;
+  updateBatchActions();
+}
+
+function batchDelete() {
+  const ids = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => parseInt(cb.dataset.id));
+  if (ids.length === 0) return;
+  showConfirm('批量删除确认', '确定要删除选中的 ' + ids.length + ' 条记录吗？此操作不可恢复！', async () => {
+    try {
+      for (const id of ids) {
+        await deleteRecordFromDB(id);
+      }
+      await loadData();
+      populateMonthFilters();
+      toast('批量删除成功，共删除 ' + ids.length + ' 条记录');
+      renderRecords();
+    } catch (err) {
+      toast('删除失败：' + err.message, 'error');
+    }
+  });
+}
+
+function confirmDeleteRecord(id) {
+  showConfirm('删除确认', '确定要删除这条记录吗？此操作不可恢复！', async () => {
+    try {
+      await deleteRecordFromDB(id);
+      await loadData();
+      populateMonthFilters();
+      toast('删除成功');
+      renderRecords();
+    } catch (err) {
+      toast('删除失败：' + err.message, 'error');
+    }
+  });
+}
+
+// ============ WEEKLY STATS ============
+function getWeekLabel(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay(); // 0=Sun,1=Mon,...,5=Fri,6=Sat
+  // Friday=5 is the start of the week
+  let diff = day - 5;
+  if (diff < 0) diff += 7;
+  const friday = new Date(d);
+  friday.setDate(d.getDate() - diff);
+  const thursday = new Date(friday);
+  thursday.setDate(friday.getDate() + 6);
+  const fmtDt = (dt) => (dt.getMonth()+1) + '/' + dt.getDate();
+  return fmtDt(friday) + '-' + fmtDt(thursday);
+}
+
+function getWeekKey(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  let diff = day - 5;
+  if (diff < 0) diff += 7;
+  const friday = new Date(d);
+  friday.setDate(d.getDate() - diff);
+  return friday.getFullYear() + '-' + String(friday.getMonth()+1).padStart(2,'0') + '-' + String(friday.getDate()).padStart(2,'0');
+}
+
+function renderWeeklyStats(filtered) {
+  const weekMap = {};
+  filtered.forEach(r => {
+    if (!r.discoverTime) return;
+    const wk = getWeekKey(r.discoverTime);
+    const wkLabel = getWeekLabel(r.discoverTime);
+    if (!weekMap[wk]) weekMap[wk] = { label: wkLabel, count: 0, types: {} };
+    weekMap[wk].count++;
+    weekMap[wk].types[r.foreignType] = (weekMap[wk].types[r.foreignType] || 0) + 1;
+  });
+  
+  const weeks = Object.keys(weekMap).sort().reverse();
+  
+  // Week stats cards
+  const statsHtml = weeks.slice(0, 6).map(wk => {
+    const w = weekMap[wk];
+    return '<div class="stat-card"><div class="stat-icon blue">📅</div><div class="stat-info"><h3>' + w.count + '</h3><p>' + w.label + '</p></div></div>';
+  }).join('');
+  document.getElementById('weekStats').innerHTML = statsHtml || '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8">暂无数据</div>';
+  
+  // Week detail table
+  let tableHtml = '<thead><tr><th>周期</th><th>总数</th>';
+  const allTypes = [...new Set(filtered.map(r => r.foreignType).filter(Boolean))];
+  allTypes.forEach(t => { tableHtml += '<th>' + t + '</th>'; });
+  tableHtml += '</tr></thead><tbody>';
+  weeks.forEach(wk => {
+    const w = weekMap[wk];
+    tableHtml += '<tr><td>' + w.label + '</td><td><strong>' + w.count + '</strong></td>';
+    allTypes.forEach(t => {
+      const cnt = w.types[t] || 0;
+      tableHtml += '<td>' + (cnt > 0 ? '<span class="badge badge-type">' + cnt + '</span>' : '-') + '</td>';
+    });
+    tableHtml += '</tr>';
+  });
+  tableHtml += '</tbody>';
+  document.getElementById('weekDetailTable').innerHTML = tableHtml;
+}
+
+// ============ PERSON RANKING WITH TYPE DETAILS ============
+function renderPersonRanking(filtered) {
+  const personMap = {};
+  filtered.forEach(r => {
+    if (!r.discoverer) return;
+    if (!personMap[r.discoverer]) personMap[r.discoverer] = { count: 0, types: {} };
+    personMap[r.discoverer].count++;
+    personMap[r.discoverer].types[r.foreignType] = (personMap[r.discoverer].types[r.foreignType] || 0) + 1;
+  });
+  
+  const sorted = Object.entries(personMap).sort((a, b) => b[1].count - a[1].count);
+  const allTypes = [...new Set(filtered.map(r => r.foreignType).filter(Boolean))];
+  
+  let tableHtml = '<thead><tr><th>排名</th><th>发现人</th><th>总数</th>';
+  allTypes.forEach(t => { tableHtml += '<th>' + t + '</th>'; });
+  tableHtml += '</tr></thead><tbody>';
+  sorted.forEach((item, idx) => {
+    const [name, data] = item;
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : (idx + 1);
+    tableHtml += '<tr><td>' + medal + '</td><td><strong>' + name + '</strong></td><td><span class="badge badge-type">' + data.count + '</span></td>';
+    allTypes.forEach(t => {
+      const cnt = data.types[t] || 0;
+      tableHtml += '<td>' + (cnt > 0 ? cnt : '-') + '</td>';
+    });
+    tableHtml += '</tr>';
+  });
+  tableHtml += '</tbody>';
+  document.getElementById('personRankTable').innerHTML = tableHtml;
 }
 
 // ============ UTILS ============
@@ -1376,6 +1588,8 @@ function populateMonthFilters() {
       select.innerHTML = '<option value="">全部月份</option>' + months.map(m => '<option value="' + m + '">' + m + '</option>').join('');
       select.value = defaultMonth;
     }
+    const hint = document.getElementById('filterMonth' + prefix + 'Hint');
+    if (hint) hint.textContent = defaultMonth ? '当前：' + defaultMonth : '当前：全部月份';
   });
 }
 
