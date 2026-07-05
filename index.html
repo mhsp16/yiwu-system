@@ -105,6 +105,12 @@ tr:hover{background:#f8fafc}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
 @media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}}
 @media print{.sidebar,.topbar{display:none}.main{margin-left:0}.card{box-shadow:none;border:1px solid #ddd}}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(2px)}
+.loading-overlay.hidden{display:none}
+.loading-spinner{width:48px;height:48px;border:4px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
+.loading-text{font-size:14px;color:var(--text2);font-weight:500}
+.loading-sub{font-size:12px;color:#94a3b8}
 </style>
 </head>
 <body>
@@ -292,6 +298,7 @@ tr:hover{background:#f8fafc}
 <div class="img-lightbox" id="imgLightbox" onclick="this.style.display='none'"><img id="lightboxImg" src=""></div>
 
 <div class="confirm-overlay" id="confirmOverlay"><div class="confirm-box"><h4 id="confirmTitle">确认操作</h4><p id="confirmDesc">此操作不可恢复</p><div class="confirm-hint">请输入"我同意此操作"以确认</div><input type="text" id="confirmInput" placeholder="我同意此操作" autocomplete="off"><div class="confirm-btns"><button class="btn btn-outline" onclick="closeConfirm()">取消</button><button class="btn btn-danger" id="confirmOkBtn" onclick="doConfirm()">确认</button></div></div></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div><div class="loading-text">正在加载数据...</div><div class="loading-sub">首次加载可能需要几秒钟</div></div>
 <div class="toast-container" id="toastContainer"></div>
 
 
@@ -341,34 +348,65 @@ function rowToRecord(row) {
   };
 }
 
-async function loadData() {
+let _dataCache = null;
+let _dataCacheTime = 0;
+const DATA_CACHE_TTL = 30000; // 30秒缓存
+
+function showLoading(text) {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    const lt = overlay.querySelector('.loading-text');
+    if (lt && text) lt.textContent = text;
+  }
+}
+function hideLoading() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+async function loadData(forceRefresh) {
+  const now = Date.now();
+  if (!forceRefresh && _dataCache && (now - _dataCacheTime) < DATA_CACHE_TTL) {
+    records = _dataCache.records;
+    config = _dataCache.config;
+    return true;
+  }
   try {
-    // Load records
-    const { data: recordsData, error: recordsError } = await sbClient
-      .from('records')
-      .select('*')
-      .order('discover_time', { ascending: false });
+    showLoading('正在加载数据...');
+    const [recordsResult, configResult] = await Promise.all([
+      sbClient.from('records').select('*').order('discover_time', { ascending: false }),
+      sbClient.from('config').select('data').eq('id', 1).single()
+    ]);
     
-    if (recordsError) throw recordsError;
-    records = (recordsData || []).map(rowToRecord);
+    if (recordsResult.error) throw recordsResult.error;
+    records = (recordsResult.data || []).map(rowToRecord);
     
-    // Load config
-    const { data: configData, error: configError } = await sbClient
-      .from('config')
-      .select('data')
-      .eq('id', 1)
-      .single();
-    
-    if (configError) throw configError;
-    if (configData && configData.data) {
-      config = configData.data;
+    if (configResult.error && configResult.error.code !== 'PGRST116') {
+      if (configResult.error.message && !configResult.error.message.includes('No rows')) {
+        console.warn('Config load warning:', configResult.error.message);
+      }
     }
+    if (configResult.data && configResult.data.data) {
+      config = configResult.data.data;
+    }
+    
+    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)) };
+    _dataCacheTime = Date.now();
     
     return true;
   } catch (err) {
     console.error('Load data error:', err);
-    toast('加载数据失败: ' + err.message, 'error');
+    if (_dataCache) {
+      records = _dataCache.records;
+      config = _dataCache.config;
+      toast('网络较慢，当前显示缓存数据', 'info');
+      return true;
+    }
+    toast('加载数据失败：' + err.message, 'error');
     return false;
+  } finally {
+    hideLoading();
   }
 }
 
@@ -718,7 +756,7 @@ async function saveRecord(event) {
   
   try {
     const savedRecord = await saveRecordToDB(record);
-    await loadData();
+    await loadData(true);
     populateMonthFilters();
     toast('保存成功！');
     showPage('records');
@@ -1556,18 +1594,31 @@ function renderWeeklyStats(filtered) {
 }
 
 // ============ PERSON RANKING BY MONTH ============
-function renderPersonRanking(filtered) {
+function renderPersonRanking(data) {
   const container = document.getElementById('personMonthRankContainer');
   if (!container) return;
   
-  const y = new Date().getFullYear();
-  const ms = Array.from({length: 12}, function(_, i) { return y + '-' + String(i + 1).padStart(2, '0'); }).reverse();
+  // Extract all years from data
+  const allYears = [...new Set(data.map(r => (r.discoverTime || '').substring(0, 4)).filter(y => y && y.length === 4 && !isNaN(parseInt(y))))];
+  if (allYears.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px">暂无数据</div>';
+    return;
+  }
+  
+  // Generate all months from all years
+  const ms = [];
+  allYears.forEach(function(y) {
+    for (let i = 12; i >= 1; i--) {
+      ms.push(y + '-' + String(i).padStart(2, '0'));
+    }
+  });
+  
   const mf = filterMonth;
   var html = '';
   
   ms.forEach(function(m) {
     if (mf && mf !== m) return;
-    var mr = records.filter(function(r) { return (r.discoverTime || '').indexOf(m) === 0; });
+    var mr = data.filter(function(r) { return (r.discoverTime || '').indexOf(m) === 0; });
     var pc = {};
     mr.forEach(function(r) { if (r.discoverer) pc[r.discoverer] = (pc[r.discoverer] || 0) + 1; });
     var ps = Object.keys(pc).sort(function(a, b) { return pc[b] - pc[a]; });
@@ -1601,7 +1652,7 @@ function renderPersonRanking(filtered) {
       });
       var typeStr = Object.keys(typeDetail).map(function(t) { return t + '(' + typeDetail[t] + ')'; }).join('、');
       
-      var medal = idx === 0 ? '🥇' : idx === 1 ? '' : idx === 2 ? '' : '';
+      var medal = idx === 0 ? '' : idx === 1 ? '' : idx === 2 ? '' : '';
       var rowStyle = idx === 0 ? 'background: #fef9c3' : idx === 1 ? 'background: #f0f4f8' : idx === 2 ? 'background: #ffedd5' : '';
       
       html += '<tr style="' + rowStyle + '">';
