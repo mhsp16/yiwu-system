@@ -332,6 +332,7 @@ let filterMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() 
 function rowToRecord(row) {
   return {
     id: row.client_id || row.id,
+    dbId: row.id,
     productName: row.product_name || '',
     batchNo: row.batch_no || '',
     workshop: row.workshop || '',
@@ -985,7 +986,7 @@ async function viewRecord(id) {
   document.getElementById('detailModal').classList.add('show');
 
   // 异步加载图片（按需从 images 表获取，不阻塞详情展示）
-  loadImagesForRecord(id).then(images => {
+  loadImagesForRecord(r.dbId).then(images => {
     const area = document.getElementById('detailImagesArea');
     if (!area) return;
     if (images.length > 0) {
@@ -1047,7 +1048,7 @@ function editRecord(id) {
   currentImages = [];
   renderImagePreview();
   // 异步加载该记录的图片
-  loadImagesForRecord(id).then(imgs => {
+  loadImagesForRecord(r.dbId).then(imgs => {
     currentImages = imgs;
     renderImagePreview();
   });
@@ -1410,7 +1411,7 @@ async function exportJSON() {
     // 为每条记录加载图片，确保备份完整
     const recordsWithImages = [];
     for (const r of records) {
-      const imgs = await loadImagesForRecord(r.id);
+      const imgs = await loadImagesForRecord(r.dbId);
       recordsWithImages.push({ ...r, images: imgs });
     }
     const blob = new Blob([JSON.stringify({ config, records: recordsWithImages }, null, 2)], { type: 'application/json' });
