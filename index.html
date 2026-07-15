@@ -378,7 +378,7 @@ async function loadData(forceRefresh) {
   try {
     showLoading('正在加载数据...');
     const [recordsResult, configResult] = await Promise.all([
-      sbClient.from('records').select('*,!images').order('discover_time', { ascending: false }),
+      sbClient.from('records').select('id,client_id,product_name,batch_no,workshop,process,discover_time,foreign_type,discoverer,risk_level,description,source_analysis,handle_measure,handle_result,responsible,rectification,remark').order('discover_time', { ascending: false }),
       sbClient.from('config').select('data').eq('id', 1).single()
     ]);
     
