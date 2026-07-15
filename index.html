@@ -388,8 +388,17 @@ async function loadData(forceRefresh) {
     if (recordsResult.error) throw recordsResult.error;
     records = (recordsResult.data || []).map(rowToRecord);
     
-    // 并行加载图片映射
-    await loadAllImages();
+    // 后台加载图片映射（不阻塞页面）
+    loadAllImages().then(() => {
+      _dataCache.imageMap = JSON.parse(JSON.stringify(imageMap));
+      // 刷新当前页面显示
+      const activePage = document.querySelector('.page.active');
+      if (activePage) {
+        const pageId = activePage.id.replace('page-', '');
+        if (pageId === 'records') renderRecords();
+        else if (pageId === 'dashboard') renderDashboard();
+      }
+    });
     
     if (configResult.error && configResult.error.code !== 'PGRST116') {
       if (configResult.error.message && !configResult.error.message.includes('No rows')) {
@@ -501,16 +510,24 @@ async function loadImagesForRecord(recordId) {
 
 async function loadAllImages() {
   try {
-    const { data, error } = await sbClient
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(30000) }) }
+    });
+    const { data, error } = await client
       .from('images')
       .select('record_id, name, data');
-    if (error || !data) return;
+    if (error) {
+      console.warn('Load images error:', error.message);
+      return;
+    }
+    if (!data) return;
     
     imageMap = {};
     data.forEach(img => {
       if (!imageMap[img.record_id]) imageMap[img.record_id] = [];
       imageMap[img.record_id].push({ name: img.name, data: img.data });
     });
+    console.log('Loaded images for', Object.keys(imageMap).length, 'records');
   } catch (err) {
     console.warn('Load images error:', err);
   }
@@ -970,7 +987,7 @@ function goToPage(page) {
   renderRecords();
 }
 
-async function viewRecord(id) {
+function viewRecord(id) {
   const r = records.find(rec => rec.id === id);
   if (!r) return;
   
@@ -1002,6 +1019,10 @@ async function viewRecord(id) {
     html += '<strong>图片：</strong><span style="color:var(--text2)">无</span>';
   }
   html += '</div>';
+  
+  document.getElementById('detailBody').innerHTML = html;
+  document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); editRecord(id); };
+  document.getElementById('detailModal').classList.add('show');
 }
 
 function editRecord(id) {
