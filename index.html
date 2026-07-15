@@ -315,6 +315,7 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 // ============ DATA ============
 let records = [];
+let imageMap = {}; // recordId -> [{name, data}]
 let config = {
   foreignTypes: ['毛发', '塑料', '金属', '玻璃', '昆虫', '纸屑', '布屑', '橡胶', '其它异物'],
   workshops: ['生产二楼车间', '生产三楼车间', '二楼包装车间', '三楼包装车间'],
@@ -374,6 +375,7 @@ async function loadData(forceRefresh) {
   if (!forceRefresh && _dataCache && (now - _dataCacheTime) < DATA_CACHE_TTL) {
     records = _dataCache.records;
     config = _dataCache.config;
+    imageMap = _dataCache.imageMap || {};
     return true;
   }
   try {
@@ -386,6 +388,9 @@ async function loadData(forceRefresh) {
     if (recordsResult.error) throw recordsResult.error;
     records = (recordsResult.data || []).map(rowToRecord);
     
+    // 并行加载图片映射
+    await loadAllImages();
+    
     if (configResult.error && configResult.error.code !== 'PGRST116') {
       if (configResult.error.message && !configResult.error.message.includes('No rows')) {
         console.warn('Config load warning:', configResult.error.message);
@@ -395,7 +400,7 @@ async function loadData(forceRefresh) {
       config = configResult.data.data;
     }
     
-    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)) };
+    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)), imageMap: JSON.parse(JSON.stringify(imageMap)) };
     _dataCacheTime = Date.now();
     
     return true;
@@ -491,16 +496,23 @@ async function deleteRecordFromDB(clientId) {
 
 // 从 images 表异步加载记录的图片（按需加载，不在列表查询中拉取）
 async function loadImagesForRecord(recordId) {
+  return imageMap[recordId] || [];
+}
+
+async function loadAllImages() {
   try {
     const { data, error } = await sbClient
       .from('images')
-      .select('name, data')
-      .eq('record_id', recordId);
-    if (error || !data) return [];
-    return data.map(img => ({ name: img.name, data: img.data }));
+      .select('record_id, name, data');
+    if (error || !data) return;
+    
+    imageMap = {};
+    data.forEach(img => {
+      if (!imageMap[img.record_id]) imageMap[img.record_id] = [];
+      imageMap[img.record_id].push({ name: img.name, data: img.data });
+    });
   } catch (err) {
     console.warn('Load images error:', err);
-    return [];
   }
 }
 
@@ -926,7 +938,7 @@ function renderRecords() {
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td>' +
       '<td>' + (r.responsible || '-') + '</td>' +
       '<td title="' + (r.description || '').replace(/"/g, '&quot;') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + desc + '</td>' +
-      '<td>' + (r.images && r.images.length > 0 ? '<span class="badge badge-type">📷 ' + r.images.length + '张</span>' : '-') + '</td>' +
+      '<td>' + (imageMap[r.dbId] && imageMap[r.dbId].length > 0 ? '<span class="badge badge-type">📷 ' + imageMap[r.dbId].length + '张</span>' : '-') + '</td>' +
       '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(' + r.id + ')">删除</button></td></tr>';
   });
   document.querySelector('#recordsTable tbody').innerHTML = html;
@@ -978,28 +990,18 @@ async function viewRecord(id) {
   if (r.handleMeasure) html += '<div style="grid-column:1/-1"><strong>处理措施：</strong>' + r.handleMeasure + '</div>';
   if (r.rectification) html += '<div style="grid-column:1/-1"><strong>整改情况：</strong>' + r.rectification + '</div>';
   if (r.remark) html += '<div style="grid-column:1/-1"><strong>备注：</strong>' + r.remark + '</div>';
-  html += '<div style="grid-column:1/-1" id="detailImagesArea"><strong>图片：</strong><span style="color:var(--text2)">加载中...</span></div>';
+  html += '<div style="grid-column:1/-1" id="detailImagesArea">';
+  const detailImgs = imageMap[r.dbId] || [];
+  if (detailImgs.length > 0) {
+    html += '<strong>图片：</strong><div class="detail-images">';
+    detailImgs.forEach(img => {
+      html += '<img src="' + img.data + '" onclick="showLightbox(\'' + img.data.replace(/'/g, "\\'") + '\')">';
+    });
+    html += '</div>';
+  } else {
+    html += '<strong>图片：</strong><span style="color:var(--text2)">无</span>';
+  }
   html += '</div>';
-  
-  document.getElementById('detailBody').innerHTML = html;
-  document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); editRecord(id); };
-  document.getElementById('detailModal').classList.add('show');
-
-  // 异步加载图片（按需从 images 表获取，不阻塞详情展示）
-  loadImagesForRecord(r.dbId).then(images => {
-    const area = document.getElementById('detailImagesArea');
-    if (!area) return;
-    if (images.length > 0) {
-      let imgHtml = '<strong>图片：</strong><div class="detail-images">';
-      images.forEach(img => {
-        imgHtml += '<img src="' + img.data + '" onclick="showLightbox(\'' + img.data.replace(/'/g, "\\'") + '\')">';
-      });
-      imgHtml += '</div>';
-      area.innerHTML = imgHtml;
-    } else {
-      area.innerHTML = '<strong>图片：</strong><span style="color:var(--text2)">无</span>';
-    }
-  });
 }
 
 function editRecord(id) {
@@ -1045,13 +1047,8 @@ function editRecord(id) {
   form.responsible.value = r.responsible || '';
   form.rectification.value = r.rectification || '';
   form.remark.value = r.remark || '';
-  currentImages = [];
+  currentImages = imageMap[r.dbId] || [];
   renderImagePreview();
-  // 异步加载该记录的图片
-  loadImagesForRecord(r.dbId).then(imgs => {
-    currentImages = imgs;
-    renderImagePreview();
-  });
   document.getElementById('submitBtn').textContent = '💾 更新记录';
 }
 
