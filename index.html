@@ -507,54 +507,39 @@ async function loadImagesForRecord(recordId) {
 async function migrateOldImages() {
   showLoading('正在迁移图片数据...');
   try {
-    // 获取所有包含旧图片数据的记录
-    const { data: oldRecords, error } = await sbClient
-      .from('records')
-      .select('client_id, images')
-      .not('images', 'is', null);
-    
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(60000) }) }
+    });
+    const { data: oldRecords, error } = await client.from('records').select('client_id, images').not('images', 'is', null);
     if (error) throw error;
-    
     let migrated = 0;
+    let skipped = 0;
+    const recordIds = (oldRecords || []).map(r => r.client_id);
+    const { data: existingImages } = await client.from('images').select('record_id').in('record_id', recordIds);
+    const migratedIds = new Set((existingImages || []).map(img => img.record_id));
+    const allImageRows = [];
     for (const row of (oldRecords || [])) {
+      if (migratedIds.has(row.client_id)) { skipped++; continue; }
       let imgs = row.images;
-      if (typeof imgs === 'string') {
-        try { imgs = JSON.parse(imgs); } catch(e) { continue; }
-      }
+      if (typeof imgs === 'string') { try { imgs = JSON.parse(imgs); } catch(e) { continue; } }
       if (!Array.isArray(imgs) || imgs.length === 0) continue;
-      
-      // 检查是否已迁移（images 表中已有该记录的图片）
-      const { data: existing } = await sbClient
-        .from('images')
-        .select('id')
-        .eq('record_id', row.client_id)
-        .limit(1);
-      if (existing && existing.length > 0) continue;
-      
-      // 插入图片到新表
-      const imgRows = imgs.map(img => ({
-        record_id: row.client_id,
-        name: img.name || 'image',
-        data: img.data || ''
-      }));
-      const { error: insErr } = await sbClient.from('images').insert(imgRows);
-      if (insErr) {
-        console.warn('迁移记录', row.client_id, '失败:', insErr.message);
-        continue;
-      }
+      imgs.forEach(img => { allImageRows.push({ record_id: row.client_id, name: img.name || 'image', data: img.data || '' }); });
       migrated++;
     }
-    
-    // 迁移完成后清空旧字段
-    if (migrated > 0) {
-      await sbClient.from('records').update({ images: null }).not('images', 'is', null);
+    if (allImageRows.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < allImageRows.length; i += batchSize) {
+        const batch = allImageRows.slice(i, i + batchSize);
+        const { error: insErr } = await client.from('images').insert(batch);
+        if (insErr) throw insErr;
+      }
     }
-    
+    if (migrated > 0) { await client.from('records').update({ images: null }).not('images', 'is', null); }
     hideLoading();
-    toast('迁移完成！共迁移 ' + migrated + ' 条记录的图片', 'success');
+    toast('迁移完成！共迁移 ' + migrated + ' 条记录的图片' + (skipped > 0 ? '，跳过 ' + skipped + ' 条已迁移' : ''), 'success');
   } catch (err) {
     hideLoading();
-    toast('迁移失败: ' + err.message, 'error');
+    toast('迁移失败：' + err.message, 'error');
   }
 }
 
@@ -1879,4 +1864,5 @@ init();
 </script>
 </body>
 </html>
+
 
