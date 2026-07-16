@@ -6,6 +6,7 @@
 <title>食品生产车间异物发现统计分析系统</title>
 <script src="supabase.js"></script>
 <script src="chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 :root{--primary:#2563eb;--primary-light:#3b82f6;--primary-dark:#1d4ed8;--success:#16a34a;--warning:#f59e0b;--danger:#dc2626;--info:#0891b2;--bg:#f0f4f8;--card:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--shadow:0 1px 3px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);--radius:12px;--radius-sm:8px}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -283,7 +284,7 @@ tr:hover{background:#f8fafc}
 <p style="margin-top:12px;font-size:13px;color:var(--text2)">JSON 格式包含完整数据和配置，可用于备份恢复；CSV 格式可用 Excel 打开</p></div>
 <div class="card"><div class="card-header"><span class="card-title">📥 导入数据</span></div>
 <div style="margin-bottom:16px"><label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px">导入 JSON 备份</label><input type="file" accept=".json" onchange="importJSON(event)" style="font-size:13px"></div>
-<div><label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px">导入 CSV 数据</label><input type="file" accept=".csv" onchange="importCSV(event)" style="font-size:13px"><p style="margin-top:6px;font-size:11px;color:var(--text2)">CSV 列顺序：序号、产品名称、批号、车间、工序、发现时间、异物类型、发现人、风险等级、描述、来源分析、处理措施、处理结果、责任人、整改情况、备注</p></div></div>
+<div><label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px">导入 CSV / Excel 数据</label><input type="file" accept=".csv,.xlsx,.xls" onchange="importCSV(event)" style="font-size:13px"><p style="margin-top:6px;font-size:11px;color:var(--text2)">支持 CSV 和 Excel (.xlsx/.xls) 格式</p><p style="font-size:11px;color:var(--text2)">列顺序：序号、产品名称、批号、车间、工序、发现时间、异物类型、发现人、风险等级、描述、来源分析、处理措施、处理结果、责任人、整改情况、备注</p></div></div>
 </div>
 
 </div>
@@ -1520,47 +1521,64 @@ async function importCSV(e) {
   const file = e.target.files[0];
   if (!file) return;
   showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据到现有记录，是否继续？', async () => {
-  const reader = new FileReader();
-  reader.onload = async (ev) => {
-    try {
-      const text = ev.target.result.replace(/^\uFEFF/, '');
-      const lines = text.split('\n').filter(l => l.trim());
-      if (lines.length < 2) { toast('CSV为空', 'error'); return; }
-      let imported = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCSVLine(lines[i]);
-        if (cols.length < 7) continue;
-        const record = {
-          id: Date.now() + i,
-          productName: cols[1] || '',
-          batchNo: cols[2] || '',
-          workshop: cols[3] || '',
-          process: cols[4] || '',
-          discoverTime: cols[5] || '',
-          foreignType: cols[6] || '',
-          discoverer: cols[7] || '',
-          riskLevel: cols[8] || '',
-          description: cols[9] || '',
-          sourceAnalysis: cols[10] || '',
-          handleMeasure: cols[11] || '',
-          handleResult: cols[12] || '待处理',
-          responsible: cols[13] || '',
-          rectification: cols[14] || '',
-          remark: cols[15] || '',
-          images: []
-        };
-        await saveRecordToDB(record);
-        imported++;
-      }
-      await loadData();
-      populateMonthFilters();
-      renderDashboard();
-      toast('导入成功，共 ' + imported + ' 条记录');
-    } catch (err) {
-      toast('解析失败: ' + err.message, 'error');
+  try {
+    let rows = [];
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    if (ext === 'xlsx' || ext === 'xls') {
+      // Excel 文件解析
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      rows = jsonData;
+    } else {
+      // CSV 文件解析
+      const text = await file.text();
+      const cleanText = text.replace(/^\uFEFF/, '');
+      const lines = cleanText.split('\n').filter(l => l.trim());
+      rows = lines.map(l => parseCSVLine(l));
     }
-  };
-  reader.readAsText(file, 'utf-8');
+    
+    if (rows.length < 2) { toast('文件为空', 'error'); return; }
+    
+    let imported = 0;
+    // 跳过标题行（第一行）
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i];
+      if (!cols || cols.length < 7) continue;
+      // 跳过空行
+      if (!cols[1] && !cols[5]) continue;
+      
+      const record = {
+        id: Date.now() + i,
+        productName: cols[1] || '',
+        batchNo: cols[2] || '',
+        workshop: cols[3] || '',
+        process: cols[4] || '',
+        discoverTime: cols[5] || '',
+        foreignType: cols[6] || '',
+        discoverer: cols[7] || '',
+        riskLevel: cols[8] || '',
+        description: cols[9] || '',
+        sourceAnalysis: cols[10] || '',
+        handleMeasure: cols[11] || '',
+        handleResult: cols[12] || '待处理',
+        responsible: cols[13] || '',
+        rectification: cols[14] || '',
+        remark: cols[15] || '',
+        images: []
+      };
+      await saveRecordToDB(record);
+      imported++;
+    }
+    await loadData();
+    populateMonthFilters();
+    renderDashboard();
+    toast('导入成功，共 ' + imported + ' 条记录');
+  } catch (err) {
+    toast('解析失败: ' + err.message, 'error');
+  }
   });
 }
 
