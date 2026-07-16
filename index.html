@@ -1528,9 +1528,9 @@ async function importCSV(e) {
     if (ext === 'xlsx' || ext === 'xls') {
       // Excel 文件解析
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false });
       rows = jsonData;
     } else {
       // CSV 文件解析
@@ -1556,7 +1556,7 @@ async function importCSV(e) {
         batchNo: cols[2] || '',
         workshop: cols[3] || '',
         process: cols[4] || '',
-        discoverTime: cols[5] || '',
+        discoverTime: formatExcelDate(cols[5]) || '',
         foreignType: cols[6] || '',
         discoverer: cols[7] || '',
         riskLevel: cols[8] || '',
@@ -1580,6 +1580,37 @@ async function importCSV(e) {
     toast('解析失败: ' + err.message, 'error');
   }
   });
+}
+
+// 将 Excel 日期（可能是 Date 对象、字符串或序列号）转换为 YYYY-MM-DD 格式
+function formatExcelDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+  if (typeof val === 'number') {
+    // Excel 序列号转日期（从 1900-01-01 起的天数）
+    const epoch = new Date(1899, 11, 30);
+    const d = new Date(epoch.getTime() + val * 86400000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+  // 字符串：尝试解析各种格式
+  const s = String(val).trim();
+  // 已经是 YYYY-MM-DD
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) return s;
+  // YYYY/MM/DD 或 YYYY/M/D
+  const m1 = s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/);
+  if (m1) return m1[1] + '-' + String(m1[2]).padStart(2, '0') + '-' + String(m1[3]).padStart(2, '0');
+  // MM/DD/YYYY
+  const m2 = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+  if (m2) return m2[3] + '-' + String(m2[1]).padStart(2, '0') + '-' + String(m2[2]).padStart(2, '0');
+  return s;
 }
 
 function parseCSVLine(line) {
