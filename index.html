@@ -360,6 +360,12 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(15000) }) }
 });
 
+// Get today's date in local timezone (YYYY-MM-DD)
+function getTodayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 // ============ DATA ============
 let records = [];
 let config = {
@@ -700,7 +706,7 @@ function renderRecentTable(filtered) {
   const recent = filtered.slice(0, 10);
   let html = '';
   recent.forEach((r, i) => {
-    const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+    const isToday = r.discoverTime === getTodayStr();
     html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
@@ -865,7 +871,7 @@ function renderRecords() {
   let html = '';
   pageData.forEach((r, i) => {
     const desc = r.description ? (r.description.length > 15 ? r.description.substring(0, 15) + '...' : r.description) : '-';
-    const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+    const isToday = r.discoverTime === getTodayStr();
     html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
@@ -1181,7 +1187,7 @@ function renderAnalysis(type) {
     // High risk detail table
     let tableHtml = '<thead><tr><th>产品</th><th>车间</th><th>发现时间</th><th>异物类型</th><th>风险等级</th><th>状态</th></tr></thead><tbody>';
     highRisk.forEach(r => {
-      const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+      const isToday = r.discoverTime === getTodayStr();
       tableHtml += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
     });
     tableHtml += '</tbody>';
@@ -1327,7 +1333,7 @@ async function exportJSON() {
   showLoading('正在导出图片...');
   try {
     const blob = new Blob([JSON.stringify({ config, records }, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, '异物管理系统备份_' + new Date().toISOString().split('T')[0] + '.json');
+    downloadBlob(blob, '异物管理系统备份_' + getTodayStr() + '.json');
     toast('JSON 导出成功');
   } catch (err) {
     toast('导出失败: ' + err.message, 'error');
@@ -1340,7 +1346,7 @@ function exportCSV() {
   const headers = ['序号','产品名称','批号','车间','工序','发现时间','异物类型','发现人','风险等级','描述','来源分析','处理措施','处理结果','责任人','整改情况','备注'];
   const rows = records.map((r, i) => [i+1, r.productName, r.batchNo, r.workshop, r.process, r.discoverTime, r.foreignType, r.discoverer, r.riskLevel, r.description, r.sourceAnalysis, r.handleMeasure, r.handleResult, r.responsible, r.rectification, r.remark].map(v => '"' + (v || '').toString().replace(/"/g, '""') + '"').join(','));
   const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '异物发现记录_' + new Date().toISOString().split('T')[0] + '.csv');
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '异物发现记录_' + getTodayStr() + '.csv');
   toast('CSV 导出成功');
 }
 
@@ -1776,7 +1782,7 @@ function addBatchRow() {
   batchRows.push({
     id,
     productName: '', batchNo: '', workshop: '', process: '',
-    discoverTime: new Date().toISOString().split('T')[0],
+    discoverTime: getTodayStr(),
     foreignType: '', discoverer: '', riskLevel: '低风险',
     description: '', sourceAnalysis: '', handleMeasure: '',
     handleResult: '待处理', responsible: '', rectification: '', remark: ''
