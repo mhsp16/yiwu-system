@@ -83,15 +83,15 @@ tr:hover{background:#f8fafc}
 .config-list{display:flex;flex-wrap:wrap;gap:8px}
 .config-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f1f5f9;border-radius:20px;font-size:13px}
 .config-tag .remove{cursor:pointer;color:var(--danger);font-weight:bold}
-.image-upload-area{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:#fafbfc}
-.image-upload-area:hover,.image-upload-area.dragover{border-color:var(--primary);background:#eff6ff}
-.image-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:12px}
-.image-preview-item{position:relative;border-radius:var(--radius-sm);overflow:hidden;aspect-ratio:1;background:#f1f5f9;box-shadow:var(--shadow)}
-.image-preview-item img{width:100%;height:100%;object-fit:cover}
-.image-preview-item .remove-img{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(220,38,38,.9);color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
-.image-preview-item .img-name{position:absolute;bottom:0;left:0;right:0;padding:2px 6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.detail-images{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:8px}
-.detail-images img{width:100%;border-radius:var(--radius-sm);cursor:pointer;transition:transform .2s;aspect-ratio:1;object-fit:cover}
+
+
+
+
+
+
+
+
+
 .detail-images img:hover{transform:scale(1.05)}
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}.confirm-overlay.show{display:flex}
 .confirm-box{background:#fff;border-radius:12px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -101,8 +101,8 @@ tr:hover{background:#f8fafc}
 .confirm-box input:focus{border-color:#2563eb}
 .confirm-box .confirm-btns{display:flex;gap:8px;justify-content:flex-end}
 .confirm-box .confirm-hint{font-size:12px;color:#94a3b8;margin-bottom:12px}
-.img-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:none;align-items:center;justify-content:center;cursor:pointer}
-.img-lightbox img{max-width:90vw;max-height:90vh;border-radius:8px}
+
+
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
 @media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}}
 @media print{.sidebar,.topbar{display:none}.main{margin-left:0}.card{box-shadow:none;border:1px solid #ddd}}
@@ -112,6 +112,10 @@ tr:hover{background:#f8fafc}
 .loading-spinner{width:48px;height:48px;border:4px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
 .loading-text{font-size:14px;color:var(--text2);font-weight:500}
 .loading-sub{font-size:12px;color:#94a3b8}
+
+tr.today-row{background:#eff6ff !important;border-left:3px solid #2563eb}
+tr.today-row td:first-child{font-weight:600}
+.today-badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:10px;font-size:10px;background:#2563eb;color:#fff;margin-left:4px}
 </style>
 </head>
 <body>
@@ -124,6 +128,8 @@ tr:hover{background:#f8fafc}
 <div class="nav-group">数据管理</div>
 <div class="nav-item" data-page="entry"><span class="icon">📝</span>快捷录入</div>
 <div class="nav-item" data-page="records"><span class="icon">📋</span>记录查询</div>
+<div class="nav-item" data-page="batch-entry"><span class="icon">📑</span>批量录入</div>
+
 <div class="nav-group">统计分析</div>
 <div class="nav-item" data-page="analysis-type"><span class="icon">🔍</span>按异物类型</div>
 <div class="nav-item" data-page="analysis-workshop"><span class="icon">🏗️</span>按生产车间</div>
@@ -182,10 +188,7 @@ tr:hover{background:#f8fafc}
 <div class="form-group"><label class="form-label">责任人</label><input class="form-input" name="responsible" placeholder="整改责任人"></div>
 <div class="form-group full"><label class="form-label">整改完成情况</label><textarea class="form-textarea" name="rectification" placeholder="整改完成情况及验证结果"></textarea></div>
 <div class="form-group full"><label class="form-label">备注</label><input class="form-input" name="remark" placeholder="其他需要说明的事项"></div>
-<div class="form-group full"><label class="form-label">📷 现场图片</label>
-<div class="image-upload-area" id="imageUploadArea" onclick="document.getElementById('imageFileInput').click()"><input type="file" id="imageFileInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)"><div id="uploadPlaceholder"><span style="font-size:36px">📷</span><p style="margin-top:8px;font-size:13px;color:var(--text2)">点击或拖拽上传图片（支持多张）</p><p style="font-size:11px;color:#94a3b8">支持 JPG/PNG/GIF，单张最大 5MB</p></div></div>
-<div class="image-preview-grid" id="imagePreviewGrid"></div></div>
-</div>
+
 <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="resetForm()">重置</button><button type="submit" class="btn btn-primary" id="submitBtn">💾 保存记录</button></div>
 </form></div></div>
 
@@ -204,10 +207,55 @@ tr:hover{background:#f8fafc}
 <select class="form-select" id="filterStatus" onchange="renderRecords()" style="padding:7px 10px;font-size:13px"><option value="">全部状态</option><option value="待处理">待处理</option><option value="已处理">已处理</option><option value="已关闭">已关闭</option></select>
 </div>
 </div>
-<div id="batchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="selectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAll()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAll()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑️ 批量删除</button></div></div></div><div class="table-wrapper"><table id="recordsTable"><thead><tr><th style="width:36px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" style="cursor:pointer"></th><th>序号</th><th>产品名称</th><th>批号</th><th>车间</th><th>工序</th><th>发现时间</th><th>异物类型</th><th>发现人</th><th>风险等级</th><th>处理状态</th><th>责任人</th><th>异物描述</th><th>现场图片</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+<div id="batchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="selectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAll()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAll()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑️ 批量删除</button></div></div></div><div class="table-wrapper"><table id="recordsTable"><thead><tr><th style="width:36px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" style="cursor:pointer"></th><th>序号</th><th>产品名称</th><th>批号</th><th>车间</th><th>工序</th><th>发现时间</th><th>异物类型</th><th>发现人</th><th>风险等级</th><th>处理状态</th><th>责任人</th><th>异物描述</th><th>操作</th></tr></thead><tbody></tbody></table></div>
 <div class="pagination" id="recordsPagination"></div>
 <div style="text-align:right;margin-top:8px;font-size:11px;color:var(--text2)" id="recordsCount"></div>
 </div></div>
+
+
+<!-- Batch Entry -->
+<div class="page" id="page-batch-entry">
+<div class="card">
+<div class="card-header">
+<span class="card-title">📑 批量录入</span>
+<span class="card-subtitle">添加多条记录后一次性提交</span>
+</div>
+<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<button class="btn btn-primary" onclick="addBatchRow()">＋ 添加一行</button>
+<button class="btn btn-success" onclick="submitBatch()">📤 批量提交</button>
+<button class="btn btn-outline" onclick="clearBatch()">🗑️ 清空列表</button>
+<span id="batchCount" style="font-size:13px;color:var(--text2);margin-left:8px">共 0 条待提交</span>
+</div>
+<div class="table-wrapper">
+<table id="batchTable">
+<thead><tr>
+<th style="width:36px">#</th>
+<th>产品名称 *</th>
+<th>批号</th>
+<th>车间 *</th>
+<th>工序</th>
+<th>发现时间 *</th>
+<th>异物类型 *</th>
+<th>发现人 *</th>
+<th>风险等级</th>
+<th>描述</th>
+<th>来源分析</th>
+<th>处理措施</th>
+<th>处理结果</th>
+<th>责任人</th>
+<th>整改情况</th>
+<th>备注</th>
+<th style="width:60px">操作</th>
+</tr></thead>
+<tbody id="batchBody"></tbody>
+</table>
+</div>
+<div id="batchProgress" style="display:none;margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
+<div style="font-size:13px;font-weight:600;color:#166534" id="batchProgressText">正在提交...</div>
+<div style="margin-top:8px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden"><div id="batchProgressBar" style="height:100%;background:#16a34a;border-radius:3px;transition:width .3s;width:0%"></div></div>
+</div>
+</div>
+</div>
 
 <!-- Analysis pages -->
 <div class="page" id="page-analysis-type">
@@ -273,8 +321,8 @@ tr:hover{background:#f8fafc}
 <div style="display:flex;gap:8px;margin-bottom:12px"><input class="form-input" id="newProcessName" placeholder="输入工序名称" style="max-width:240px"><button class="btn btn-primary" onclick="addProcess()">添加</button></div>
 <div class="config-list" id="processList2"></div></div>
 <div class="card"><div class="card-header"><span class="card-title">⚠️ 危险操作</span></div>
-<div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-danger" onclick="showConfirm('清空确认','确定要清空所有记录吗？此操作不可恢复！',clearAllRecords)">🗑️ 清空所有记录</button><button class="btn btn-outline" onclick="showConfirm('恢复确认','确定要恢复默认配置吗？',resetConfig)">↩️ 恢复默认配置</button><button class="btn btn-warning" onclick="migrateOldImages()">🔄 迁移旧图片数据</button></div>
-<p style="margin-top:8px;font-size:11px;color:var(--text2)">「迁移旧图片」将旧的 base64 图片数据迁移到独立存储表，大幅提升加载速度（仅需执行一次）</p></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-danger" onclick="showConfirm('清空确认','确定要清空所有记录吗？此操作不可恢复！',clearAllRecords)">🗑️ 清空所有记录</button><button class="btn btn-outline" onclick="showConfirm('恢复确认','确定要恢复默认配置吗？',resetConfig)">↩️ 恢复默认配置</button></div>
+</div>
 </div>
 
 <!-- Import/Export -->
@@ -296,8 +344,7 @@ tr:hover{background:#f8fafc}
 <div class="modal-body" id="detailBody"></div>
 <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('detailModal')">关闭</button><button class="btn btn-primary" id="detailEditBtn">编辑</button></div></div></div>
 
-<!-- Image Lightbox -->
-<div class="img-lightbox" id="imgLightbox" onclick="this.style.display='none'"><img id="lightboxImg" src=""></div>
+
 
 <div class="confirm-overlay" id="confirmOverlay"><div class="confirm-box"><h4 id="confirmTitle">确认操作</h4><p id="confirmDesc">此操作不可恢复</p><div class="confirm-hint">请输入"我同意此操作"以确认</div><input type="text" id="confirmInput" placeholder="我同意此操作" autocomplete="off"><div class="confirm-btns"><button class="btn btn-outline" onclick="closeConfirm()">取消</button><button class="btn btn-danger" id="confirmOkBtn" onclick="doConfirm()">确认</button></div></div></div>
 <div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div><div class="loading-text">正在加载数据...</div><div class="loading-sub">首次加载可能需要几秒钟</div></div>
@@ -316,8 +363,6 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 // ============ DATA ============
 let records = [];
-let imageMap = {}; // recordId -> [{name, data}] (已加载的图片)
-let imageCountMap = {}; // recordId -> count (轻量级计数)
 let config = {
   foreignTypes: ['毛发', '塑料', '金属', '玻璃', '昆虫', '纸屑', '布屑', '橡胶', '其它异物'],
   workshops: ['生产二楼车间', '生产三楼车间', '二楼包装车间', '三楼包装车间'],
@@ -327,7 +372,6 @@ let config = {
 };
 let currentPage = 1, pageSize = 15;
 let charts = {};
-let currentImages = [];
 let filterMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
 
 // ============ SUPABASE DATA OPERATIONS ============
@@ -351,7 +395,6 @@ function rowToRecord(row) {
     responsible: row.responsible || '',
     rectification: row.rectification || '',
     remark: row.remark || '',
-    images: row.images || []
   };
 }
 
@@ -377,8 +420,7 @@ async function loadData(forceRefresh) {
   if (!forceRefresh && _dataCache && (now - _dataCacheTime) < DATA_CACHE_TTL) {
     records = _dataCache.records;
     config = _dataCache.config;
-    imageMap = _dataCache.imageMap || {};
-    return true;
+        return true;
   }
   try {
     showLoading('正在加载数据...');
@@ -390,17 +432,7 @@ async function loadData(forceRefresh) {
     if (recordsResult.error) throw recordsResult.error;
     records = (recordsResult.data || []).map(rowToRecord);
     
-    // 后台加载图片映射（不阻塞页面）
-    loadAllImages().then(() => {
-      _dataCache.imageMap = JSON.parse(JSON.stringify(imageMap));
-      // 刷新当前页面显示
-      const activePage = document.querySelector('.page.active');
-      if (activePage) {
-        const pageId = activePage.id.replace('page-', '');
-        if (pageId === 'records') renderRecords();
-        else if (pageId === 'dashboard') renderDashboard();
-      }
-    });
+
     
     if (configResult.error && configResult.error.code !== 'PGRST116') {
       if (configResult.error.message && !configResult.error.message.includes('No rows')) {
@@ -411,7 +443,7 @@ async function loadData(forceRefresh) {
       config = configResult.data.data;
     }
     
-    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)), imageMap: JSON.parse(JSON.stringify(imageMap)) };
+    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)),  };
     _dataCacheTime = Date.now();
     
     return true;
@@ -464,23 +496,7 @@ async function saveRecordToDB(record) {
     
     if (error) throw error;
 
-    // 图片保存到独立的 images 表
-    const images = record.images || [];
-    if (images.length > 0) {
-      // 编辑时先清除旧图片
-      await sbClient.from('images').delete().eq('record_id', data.client_id);
-      // 批量插入新图片
-      const imgRows = images.map(img => ({
-        record_id: data.client_id,
-        name: img.name || 'image',
-        data: img.data || ''
-      }));
-      const { error: imgErr } = await sbClient.from('images').insert(imgRows);
-      if (imgErr) console.warn('图片保存失败:', imgErr.message);
-    } else if (record._clearImages) {
-      // 编辑时清空图片
-      await sbClient.from('images').delete().eq('record_id', data.client_id);
-    }
+
 
     return data;
   } catch (err) {
@@ -506,90 +522,9 @@ async function deleteRecordFromDB(clientId) {
 }
 
 // 从 images 表异步加载记录的图片（按需加载，不在列表查询中拉取）
-async function loadImagesForRecord(recordId) {
-  // 如果已加载过，直接返回
-  if (imageMap[recordId]) return imageMap[recordId];
-  try {
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(30000) }) }
-    });
-    const { data, error } = await client
-      .from('images')
-      .select('name, data')
-      .eq('record_id', recordId);
-    if (error || !data) return [];
-    imageMap[recordId] = data.map(img => ({ name: img.name, data: img.data }));
-    return imageMap[recordId];
-  } catch (err) {
-    console.warn('Load images error:', err);
-    return [];
-  }
-}
 
-async function loadAllImages() {
-  // 只加载图片计数（不含 base64 数据），避免超时
-  try {
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(30000) }) }
-    });
-    const { data, error } = await client
-      .from('images')
-      .select('record_id');
-    if (error) {
-      console.warn('Load image counts error:', error.message);
-      return;
-    }
-    if (!data) return;
-    
-    imageCountMap = {};
-    data.forEach(img => {
-      imageCountMap[img.record_id] = (imageCountMap[img.record_id] || 0) + 1;
-    });
-    console.log('Loaded image counts for', Object.keys(imageCountMap).length, 'records');
-  } catch (err) {
-    console.warn('Load image counts error:', err);
-  }
-}
 
 // 迁移旧数据：将 records 表中 base64 图片迁移到独立 images 表
-async function migrateOldImages() {
-  showLoading('正在迁移图片数据...');
-  try {
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(60000) }) }
-    });
-    const { data: oldRecords, error } = await client.from('records').select('client_id, images').not('images', 'is', null);
-    if (error) throw error;
-    let migrated = 0;
-    let skipped = 0;
-    const recordIds = (oldRecords || []).map(r => r.client_id);
-    const { data: existingImages } = await client.from('images').select('record_id').in('record_id', recordIds);
-    const migratedIds = new Set((existingImages || []).map(img => img.record_id));
-    const allImageRows = [];
-    for (const row of (oldRecords || [])) {
-      if (migratedIds.has(row.client_id)) { skipped++; continue; }
-      let imgs = row.images;
-      if (typeof imgs === 'string') { try { imgs = JSON.parse(imgs); } catch(e) { continue; } }
-      if (!Array.isArray(imgs) || imgs.length === 0) continue;
-      imgs.forEach(img => { allImageRows.push({ record_id: row.client_id, name: img.name || 'image', data: img.data || '' }); });
-      migrated++;
-    }
-    if (allImageRows.length > 0) {
-      const batchSize = 100;
-      for (let i = 0; i < allImageRows.length; i += batchSize) {
-        const batch = allImageRows.slice(i, i + batchSize);
-        const { error: insErr } = await client.from('images').insert(batch);
-        if (insErr) throw insErr;
-      }
-    }
-    if (migrated > 0) { await client.from('records').update({ images: null }).not('images', 'is', null); }
-    hideLoading();
-    toast('迁移完成！共迁移 ' + migrated + ' 条记录的图片' + (skipped > 0 ? '，跳过 ' + skipped + ' 条已迁移' : ''), 'success');
-  } catch (err) {
-    hideLoading();
-    toast('迁移失败：' + err.message, 'error');
-  }
-}
 
 async function saveConfigToDB() {
   try {
@@ -620,11 +555,12 @@ function showPage(pageId) {
   if (page) page.classList.add('active');
   const nav = document.querySelector('.nav-item[data-page="' + pageId + '"]');
   if (nav) nav.classList.add('active');
-  const titles = {dashboard:'数据看板',entry:'快捷录入',records:'记录查询','analysis-type':'按异物类型分析','analysis-workshop':'按车间分析','analysis-time':'按时间趋势分析','analysis-product':'按产品分析','analysis-person':'按发现人分析','analysis-risk':'风险等级分析',config:'系统配置','import-export':'导入导出'};
+  const titles = {dashboard:'数据看板',entry:'快捷录入',records:'记录查询','batch-entry':'批量录入','analysis-type':'按异物类型分析','analysis-workshop':'按车间分析','analysis-time':'按时间趋势分析','analysis-product':'按产品分析','analysis-person':'按发现人分析','analysis-risk':'风险等级分析',config:'系统配置','import-export':'导入导出'};
   document.getElementById('pageTitle').textContent = titles[pageId] || pageId;
   if (pageId === 'dashboard') renderDashboard();
   else if (pageId === 'records') renderRecords();
   else if (pageId === 'entry') initEntryForm();
+  else if (pageId === 'batch-entry') renderBatchTable();
   else if (pageId === 'config') renderConfig();
   else if (pageId.startsWith('analysis-')) renderAnalysis(pageId.replace('analysis-',''));
   document.getElementById('sidebar').classList.remove('open');
@@ -765,7 +701,7 @@ function renderRecentTable(filtered) {
   const recent = filtered.slice(0, 10);
   let html = '';
   recent.forEach((r, i) => {
-    html += '<tr><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + '</td>' +
+    html += '<tr><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
@@ -821,8 +757,6 @@ function initEntryForm() {
   form.reset();
   document.getElementById('editId').value = '';
   document.getElementById('submitBtn').textContent = '💾 保存记录';
-  currentImages = [];
-  renderImagePreview();
   
   // Populate selects
   const workshopSelect = form.querySelector('[name="workshop"]');
@@ -876,7 +810,6 @@ async function saveRecord(event) {
     responsible: form.responsible.value.trim(),
     rectification: form.rectification.value.trim(),
     remark: form.remark.value.trim(),
-    images: currentImages
   };
   
   try {
@@ -897,43 +830,8 @@ function resetForm() {
 }
 
 // ============ IMAGE HANDLING ============
-function handleImageSelect(event) {
-  const files = event.target.files;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (file.size > 5 * 1024 * 1024) {
-      toast(file.name + ' 超过5MB，已跳过', 'error');
-      continue;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      currentImages.push({ name: file.name, data: e.target.result });
-      renderImagePreview();
-    };
-    reader.readAsDataURL(file);
-  }
-  event.target.value = '';
-}
 
-function renderImagePreview() {
-  const grid = document.getElementById('imagePreviewGrid');
-  if (currentImages.length === 0) {
-    grid.innerHTML = '';
-    document.getElementById('uploadPlaceholder').style.display = 'block';
-    return;
-  }
-  document.getElementById('uploadPlaceholder').style.display = 'none';
-  grid.innerHTML = currentImages.map((img, i) => 
-    '<div class="image-preview-item"><img src="' + img.data + '" alt="' + img.name + '">' +
-    '<button class="remove-img" onclick="removeImage(' + i + ')">×</button>' +
-    '<div class="img-name">' + img.name + '</div></div>'
-  ).join('');
-}
 
-function removeImage(index) {
-  currentImages.splice(index, 1);
-  renderImagePreview();
-}
 
 // ============ RECORDS ============
 function renderRecords() {
@@ -967,13 +865,14 @@ function renderRecords() {
   let html = '';
   pageData.forEach((r, i) => {
     const desc = r.description ? (r.description.length > 15 ? r.description.substring(0, 15) + '...' : r.description) : '-';
-    html += '<tr><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + '</td>' +
+    const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td>' +
       '<td>' + (r.responsible || '-') + '</td>' +
       '<td title="' + (r.description || '').replace(/"/g, '&quot;') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + desc + '</td>' +
-      '<td>' + (imageCountMap[r.dbId] > 0 ? '<span class="badge badge-type">📷 ' + imageCountMap[r.dbId] + '张</span>' : '-') + '</td>' +
+      
       '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(' + r.id + ')">删除</button></td></tr>';
   });
   document.querySelector('#recordsTable tbody').innerHTML = html;
@@ -1025,22 +924,13 @@ function viewRecord(id) {
   if (r.handleMeasure) html += '<div style="grid-column:1/-1"><strong>处理措施：</strong>' + r.handleMeasure + '</div>';
   if (r.rectification) html += '<div style="grid-column:1/-1"><strong>整改情况：</strong>' + r.rectification + '</div>';
   if (r.remark) html += '<div style="grid-column:1/-1"><strong>备注：</strong>' + r.remark + '</div>';
-  html += '<div style="grid-column:1/-1" id="detailImagesArea"><strong>图片：</strong><span style="color:var(--text2)">加载中...</span></div>';
   html += '</div>';
   
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); editRecord(id); };
   document.getElementById('detailModal').classList.add('show');
 
-  // 按需加载图片数据
-  loadImagesForRecord(r.dbId).then(images => {
-    const area = document.getElementById('detailImagesArea');
-    if (!area) return;
-    if (images.length > 0) {
-      let imgHtml = '<strong>图片：</strong><div class="detail-images">';
-      images.forEach(img => {
-        imgHtml += '<img src="' + img.data + '" onclick="showLightbox(\'' + img.data.replace(/'/g, "\\'") + '\')">';
-      });
+
       imgHtml += '</div>';
       area.innerHTML = imgHtml;
     } else {
@@ -1092,22 +982,12 @@ function editRecord(id) {
   form.responsible.value = r.responsible || '';
   form.rectification.value = r.rectification || '';
   form.remark.value = r.remark || '';
-  currentImages = [];
-  renderImagePreview();
-  // 按需加载该记录的图片
-  loadImagesForRecord(r.dbId).then(imgs => {
-    currentImages = imgs;
-    renderImagePreview();
-  });
+
   document.getElementById('submitBtn').textContent = '💾 更新记录';
 }
 
 // deleteRecord replaced by confirmDeleteRecord (see batch actions section)
 
-function showLightbox(src) {
-  document.getElementById('lightboxImg').src = src;
-  document.getElementById('imgLightbox').style.display = 'flex';
-}
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
@@ -1310,7 +1190,7 @@ function renderAnalysis(type) {
     // High risk detail table
     let tableHtml = '<thead><tr><th>产品</th><th>车间</th><th>发现时间</th><th>异物类型</th><th>风险等级</th><th>状态</th></tr></thead><tbody>';
     highRisk.forEach(r => {
-      tableHtml += '<tr><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
+      tableHtml += '<tr><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
     });
     tableHtml += '</tbody>';
     document.getElementById('riskDetailTable').innerHTML = tableHtml;
@@ -1427,7 +1307,6 @@ function removeConfig(key, item) {
 
 async function clearAllRecords() {
   try {
-    await sbClient.from('images').delete().neq('id', 0);
     await sbClient.from('records').delete().neq('id', 0);
     records = [];
     toast('所有记录已清空');
@@ -1455,13 +1334,7 @@ async function resetConfig() {
 async function exportJSON() {
   showLoading('正在导出图片...');
   try {
-    // 为每条记录加载图片，确保备份完整
-    const recordsWithImages = [];
-    for (const r of records) {
-      const imgs = await loadImagesForRecord(r.dbId);
-      recordsWithImages.push({ ...r, images: imgs });
-    }
-    const blob = new Blob([JSON.stringify({ config, records: recordsWithImages }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ config, records }, null, 2)], { type: 'application/json' });
     downloadBlob(blob, '异物管理系统备份_' + new Date().toISOString().split('T')[0] + '.json');
     toast('JSON 导出成功');
   } catch (err) {
@@ -1902,6 +1775,162 @@ function updateClock() {
   document.getElementById('currentTime').textContent = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short' });
 }
 
+
+// ============ BATCH ENTRY ============
+let batchRows = [];
+
+function addBatchRow() {
+  const id = Date.now() + Math.random();
+  batchRows.push({
+    id,
+    productName: '', batchNo: '', workshop: '', process: '',
+    discoverTime: new Date().toISOString().split('T')[0],
+    foreignType: '', discoverer: '', riskLevel: '低风险',
+    description: '', sourceAnalysis: '', handleMeasure: '',
+    handleResult: '待处理', responsible: '', rectification: '', remark: ''
+  });
+  renderBatchTable();
+}
+
+function renderBatchTable() {
+  const tbody = document.getElementById('batchBody');
+  if (!tbody) return;
+  if (batchRows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:#94a3b8">点击"添加一行"开始录入</td></tr>';
+    document.getElementById('batchCount').textContent = '共 0 条待提交';
+    return;
+  }
+  let html = '';
+  batchRows.forEach((row, idx) => {
+    const productOpts = config.products.map(p => '<option value="'+p+'"'+(p===row.productName?' selected':'')+'>'+p+'</option>').join('');
+    const workshopOpts = config.workshops.map(w => '<option value="'+w+'"'+(w===row.workshop?' selected':'')+'>'+w+'</option>').join('');
+    const processOpts = config.processes.map(p => '<option value="'+p+'"'+(p===row.process?' selected':'')+'>'+p+'</option>').join('');
+    const typeOpts = config.foreignTypes.map(t => '<option value="'+t+'"'+(t===row.foreignType?' selected':'')+'>'+t+'</option>').join('');
+    const discovererOpts = config.discoverers.map(d => '<option value="'+d+'"'+(d===row.discoverer?' selected':'')+'>'+d+'</option>').join('');
+    const riskLevels = ['低风险','中风险','高风险','重大风险'];
+    const riskOpts = riskLevels.map(r => '<option value="'+r+'"'+(r===row.riskLevel?' selected':'')+'>'+r+'</option>').join('');
+    const resultOpts = ['待处理','已处理','已关闭'].map(s => '<option value="'+s+'"'+(s===row.handleResult?' selected':'')+'>'+s+'</option>').join('');
+
+    html += '<tr>' +
+      '<td>' + (idx+1) + '</td>' +
+      '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'productName\',this.value)"><option value="">请选择</option>' + productOpts + '</select></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.batchNo||'')+'" onchange="updateBatchRow('+idx+',\'batchNo\',this.value)" placeholder="批号"></td>' +
+      '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'workshop\',this.value)"><option value="">请选择</option>' + workshopOpts + '</select></td>' +
+      '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'process\',this.value)"><option value="">请选择</option>' + processOpts + '</select></td>' +
+      '<td><input class="form-input" type="date" style="min-width:120px;padding:4px 8px;font-size:12px" value="'+(row.discoverTime||'')+'" onchange="updateBatchRow('+idx+',\'discoverTime\',this.value)"></td>' +
+      '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'foreignType\',this.value)"><option value="">请选择</option>' + typeOpts + '</select></td>' +
+      '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'discoverer\',this.value)"><option value="">请选择</option>' + discovererOpts + '</select></td>' +
+      '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'riskLevel\',this.value)">' + riskOpts + '</select></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.description||'')+'" onchange="updateBatchRow('+idx+',\'description\',this.value)" placeholder="描述"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.sourceAnalysis||'')+'" onchange="updateBatchRow('+idx+',\'sourceAnalysis\',this.value)" placeholder="来源"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.handleMeasure||'')+'" onchange="updateBatchRow('+idx+',\'handleMeasure\',this.value)" placeholder="措施"></td>' +
+      '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'handleResult\',this.value)">' + resultOpts + '</select></td>' +
+      '<td><input class="form-input" style="min-width:70px;padding:4px 8px;font-size:12px" value="'+(row.responsible||'')+'" onchange="updateBatchRow('+idx+',\'responsible\',this.value)" placeholder="责任人"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.rectification||'')+'" onchange="updateBatchRow('+idx+',\'rectification\',this.value)" placeholder="整改"></td>' +
+      '<td><input class="form-input" style="min-width:80px;padding:4px 8px;font-size:12px" value="'+(row.remark||'')+'" onchange="updateBatchRow('+idx+',\'remark\',this.value)" placeholder="备注"></td>' +
+      '<td><button class="btn btn-sm btn-danger" onclick="removeBatchRow('+idx+')">✕</button></td>' +
+      '</tr>';
+  });
+  tbody.innerHTML = html;
+  document.getElementById('batchCount').textContent = '共 ' + batchRows.length + ' 条待提交';
+}
+
+function updateBatchRow(idx, field, value) {
+  if (idx >= 0 && idx < batchRows.length) {
+    batchRows[idx][field] = value;
+  }
+}
+
+function removeBatchRow(idx) {
+  batchRows.splice(idx, 1);
+  renderBatchTable();
+}
+
+function clearBatch() {
+  if (batchRows.length === 0) return;
+  showConfirm('清空确认', '确定要清空所有待提交的批量数据吗？', () => {
+    batchRows = [];
+    renderBatchTable();
+    document.getElementById('batchProgress').style.display = 'none';
+  });
+}
+
+async function submitBatch() {
+  if (batchRows.length === 0) { toast('请先添加数据', 'error'); return; }
+  
+  // Validate
+  const invalid = [];
+  batchRows.forEach((row, idx) => {
+    if (!row.productName) invalid.push('第'+(idx+1)+'行: 产品名称');
+    if (!row.workshop) invalid.push('第'+(idx+1)+'行: 车间');
+    if (!row.discoverTime) invalid.push('第'+(idx+1)+'行: 发现时间');
+    if (!row.foreignType) invalid.push('第'+(idx+1)+'行: 异物类型');
+    if (!row.discoverer) invalid.push('第'+(idx+1)+'行: 发现人');
+  });
+  if (invalid.length > 0) {
+    toast('请填写必填项：\n' + invalid.slice(0, 5).join('\n') + (invalid.length > 5 ? '\n...' : ''), 'error');
+    return;
+  }
+
+  const progress = document.getElementById('batchProgress');
+  const progressBar = document.getElementById('batchProgressBar');
+  const progressText = document.getElementById('batchProgressText');
+  progress.style.display = 'block';
+  
+  let success = 0, failed = 0;
+  const total = batchRows.length;
+  
+  for (let i = 0; i < batchRows.length; i++) {
+    const row = batchRows[i];
+    progressText.textContent = '正在提交 ' + (i+1) + '/' + total + '...';
+    progressBar.style.width = ((i+1)/total*100) + '%';
+    
+    try {
+      const record = {
+        id: Date.now() + i + Math.floor(Math.random()*1000),
+        productName: row.productName,
+        batchNo: row.batchNo,
+        workshop: row.workshop,
+        process: row.process,
+        discoverTime: row.discoverTime,
+        foreignType: row.foreignType,
+        discoverer: row.discoverer,
+        riskLevel: row.riskLevel,
+        description: row.description,
+        sourceAnalysis: row.sourceAnalysis,
+        handleMeasure: row.handleMeasure,
+        handleResult: row.handleResult,
+        responsible: row.responsible,
+        rectification: row.rectification,
+        remark: row.remark
+      };
+      await saveRecordToDB(record);
+      success++;
+    } catch (err) {
+      failed++;
+      console.error('Batch submit row ' + (i+1) + ' error:', err);
+    }
+  }
+  
+  await loadData(true);
+  populateMonthFilters();
+  
+  progressText.textContent = '提交完成！成功 ' + success + ' 条' + (failed > 0 ? '，失败 ' + failed + ' 条' : '');
+  progressBar.style.width = '100%';
+  progressBar.style.background = failed > 0 ? '#f59e0b' : '#16a34a';
+  
+  toast('批量提交完成：成功 ' + success + ' 条' + (failed > 0 ? '，失败 ' + failed + ' 条' : ''), failed > 0 ? 'error' : 'success');
+  
+  if (failed === 0) {
+    batchRows = [];
+    setTimeout(() => {
+      renderBatchTable();
+      progress.style.display = 'none';
+      progressBar.style.width = '0%';
+    }, 2000);
+  }
+}
+
 // ============ INIT ============
 function populateMonthFilters() {
   const months = [...new Set(records.map(r => r.discoverTime ? r.discoverTime.substring(0, 7) : '').filter(Boolean))].sort().reverse();
@@ -1956,6 +1985,14 @@ async function init() {
   }
 }
 
+
+// Auto-refresh today highlight every 60 seconds
+setInterval(() => {
+  const activePage = document.querySelector('.page.active');
+  if (activePage && activePage.id === 'page-records') {
+    renderRecords();
+  }
+}, 60000);
 init();
 </script>
 </body>
