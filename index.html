@@ -929,14 +929,6 @@ function viewRecord(id) {
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); editRecord(id); };
   document.getElementById('detailModal').classList.add('show');
-
-
-      imgHtml += '</div>';
-      area.innerHTML = imgHtml;
-    } else {
-      area.innerHTML = '<strong>图片：</strong><span style="color:var(--text2)">无</span>';
-    }
-  });
 }
 
 function editRecord(id) {
