@@ -701,7 +701,8 @@ function renderRecentTable(filtered) {
   const recent = filtered.slice(0, 10);
   let html = '';
   recent.forEach((r, i) => {
-    html += '<tr><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
+    const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
@@ -1182,7 +1183,8 @@ function renderAnalysis(type) {
     // High risk detail table
     let tableHtml = '<thead><tr><th>产品</th><th>车间</th><th>发现时间</th><th>异物类型</th><th>风险等级</th><th>状态</th></tr></thead><tbody>';
     highRisk.forEach(r => {
-      tableHtml += '<tr><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
+      const isToday = r.discoverTime === new Date().toISOString().split('T')[0];
+      tableHtml += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
     });
     tableHtml += '</tbody>';
     document.getElementById('riskDetailTable').innerHTML = tableHtml;
