@@ -125,7 +125,22 @@ tr:hover{background:#f8fafc}
 
 
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
-@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-stats{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}}
+@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:8px}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}
+.dashboard-stats .stat-card{padding:10px;gap:8px}
+.dashboard-stats .stat-icon{width:36px;height:36px;font-size:18px}
+.dashboard-stats .stat-info h3{font-size:18px}
+.dashboard-stats .stat-info p{font-size:11px}
+#typeStatsContainer>div>div:last-child{display:flex!important;overflow-x:auto;gap:10px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+#typeStatsContainer>div>div:last-child>div{min-width:110px;flex-shrink:0}
+#workshopStatsContainer>div{display:flex!important;overflow-x:auto;gap:8px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+#workshopStatsContainer>div>div{min-width:100px;flex-shrink:0}
+#riskStatsContainer>div{display:flex!important;overflow-x:auto;gap:8px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+#riskStatsContainer>div>div{min-width:90px;flex-shrink:0}
+#oplogTable{table-layout:auto!important;min-width:600px}
+#oplogTable td:last-child{white-space:normal!important;word-break:break-word!important;min-width:200px}
+.card{padding:14px}
+.card-header{flex-direction:column;align-items:flex-start;gap:4px}
+.content{padding:12px}}
 @media print{.sidebar,.topbar{display:none}.main{margin-left:0}.card{box-shadow:none;border:1px solid #ddd}}
 
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(2px)}
@@ -435,25 +450,96 @@ function getRiskColor(level) { return RISK_COLORS[level] || RISK_COLORS['未评�
 // ===== 操作日志 =====
 let operationLogs = [];
 const MAX_LOGS = 50;
-function loadOperationLogs() { try { const raw = localStorage.getItem('yiwu_operation_logs'); operationLogs = raw ? JSON.parse(raw) : []; } catch(e) { operationLogs = []; } }
-function saveOperationLogs() { try { if (operationLogs.length > MAX_LOGS) operationLogs = operationLogs.slice(0, MAX_LOGS); localStorage.setItem('yiwu_operation_logs', JSON.stringify(operationLogs)); } catch(e) {} }
-function addLog(action, detail) { operationLogs.unshift({ time: new Date().toLocaleString('zh-CN'), action, detail }); if (operationLogs.length > MAX_LOGS) operationLogs = operationLogs.slice(0, MAX_LOGS); saveOperationLogs(); }
+async function loadOperationLogs() {
+  try {
+    const { data, error } = await sbClient.from('operation_logs').select('*').order('created_at', { ascending: false }).limit(MAX_LOGS);
+    if (error) throw error;
+    operationLogs = (data || []).map(l => ({ time: new Date(l.created_at).toLocaleString('zh-CN'), action: l.action, detail: l.detail }));
+  } catch(e) {
+    console.error('加载操作日志失败:', e);
+    operationLogs = [];
+  }
+}
+async function saveOperationLogs() {
+  // 不再需要，每次直接写入数据库
+}
+async function addLog(action, detail) {
+  try {
+    await sbClient.from('operation_logs').insert([{ action, detail }]);
+    operationLogs.unshift({ time: new Date().toLocaleString('zh-CN'), action, detail });
+    if (operationLogs.length > MAX_LOGS) operationLogs = operationLogs.slice(0, MAX_LOGS);
+  } catch(e) {
+    console.error('添加操作日志失败:', e);
+  }
+}
 
 // ===== 最近删除 =====
 let deletedRecords = [];
-function loadDeletedRecords() { try { const raw = localStorage.getItem('yiwu_deleted_records'); deletedRecords = raw ? JSON.parse(raw) : []; } catch(e) { deletedRecords = []; } cleanExpiredDeleted(); }
-function saveDeletedRecords() { try { localStorage.setItem('yiwu_deleted_records', JSON.stringify(deletedRecords)); } catch(e) {} }
-function cleanExpiredDeleted() { const now = Date.now(); const sevenDays = 7*24*60*60*1000; const before = deletedRecords.length; deletedRecords = deletedRecords.filter(r => (now - r.deletedAt) < sevenDays); if (deletedRecords.length !== before) saveDeletedRecords(); }
+async function loadDeletedRecords() {
+  try {
+    const { data, error } = await sbClient.from('deleted_records').select('*').order('deleted_at', { ascending: false });
+    if (error) throw error;
+    deletedRecords = (data || []).map(r => ({
+      ...r,
+      deletedAt: new Date(r.deleted_at).getTime()
+    }));
+    cleanExpiredDeleted();
+  } catch(e) {
+    console.error('加载最近删除失败:', e);
+    deletedRecords = [];
+  }
+}
+async function saveDeletedRecords() {
+  // 不再需要，每次直接写入数据库
+}
+async function cleanExpiredDeleted() {
+  const now = Date.now();
+  const sevenDays = 7*24*60*60*1000;
+  const expired = deletedRecords.filter(r => (now - r.deletedAt) >= sevenDays);
+  if (expired.length > 0) {
+    const expiredIds = expired.map(r => r.id);
+    try {
+      await sbClient.from('deleted_records').delete().in('id', expiredIds);
+    } catch(e) {
+      console.error('清理过期删除记录失败:', e);
+    }
+  }
+  deletedRecords = deletedRecords.filter(r => (now - r.deletedAt) < sevenDays);
+}
 function getRemainingDays(rec) { const now = Date.now(); const sevenDays = 7*24*60*60*1000; return Math.max(0, Math.ceil((sevenDays - (now - rec.deletedAt)) / (24*60*60*1000))); }
 function isExpired(rec) { return getRemainingDays(rec) <= 0; }
 
 async function moveToDeleted(id) {
   const r = records.find(rec => rec.id === id || rec.client_id === id);
   if (!r) { toast('记录不存在', 'error'); return; }
-  deletedRecords.unshift({ ...r, deletedAt: Date.now() });
-  saveDeletedRecords();
-  await deleteRecordFromDB(r.client_id || id);
-  addLog('删除记录', `产品:${r.productName||'-'}, 批号:${r.batchNo||'-'}, 车间:${r.workshop||'-'}, 工序:${r.process||'-'}, 类型:${r.foreignType||'-'}, 发现人:${r.discoverer||'-'}, 风险:${r.riskLevel||'-'}, 时间:${r.discoverTime||'-'}`);
+  const deletedRecord = { ...r, deletedAt: Date.now() };
+  try {
+    await sbClient.from('deleted_records').insert([{
+      record_id: r.client_id || id,
+      product_name: r.productName || '',
+      batch_no: r.batchNo || '',
+      workshop: r.workshop || '',
+      process: r.process || '',
+      discover_time: r.discoverTime || '',
+      foreign_type: r.foreignType || '',
+      discoverer: r.discoverer || '',
+      risk_level: r.riskLevel || '',
+      description: r.description || '',
+      source_analysis: r.sourceAnalysis || '',
+      handle_measure: r.handleMeasure || '',
+      handle_result: r.handleResult || '待处理',
+      responsible: r.responsible || '',
+      rectification: r.rectification || '',
+      remark: r.remark || '',
+      deleted_at: new Date().toISOString()
+    }]);
+    deletedRecords.unshift(deletedRecord);
+    await deleteRecordFromDB(r.client_id || id);
+    addLog('删除记录', `产品:${r.productName||'-'}, 批号:${r.batchNo||'-'}, 车间:${r.workshop||'-'}, 工序:${r.process||'-'}, 类型:${r.foreignType||'-'}, 发现人:${r.discoverer||'-'}, 风险:${r.riskLevel||'-'}, 时间:${r.discoverTime||'-'}`);
+  } catch(e) {
+    console.error('移动到最近删除失败:', e);
+    toast('删除失败', 'error');
+  }
 }
 
 async function restoreRecord(index) {
@@ -461,45 +547,88 @@ async function restoreRecord(index) {
   if (!dr) { toast('记录不存在', 'error'); return; }
   const record = {
     id: Date.now(), client_id: Date.now(),
-    productName: dr.productName || '', batchNo: dr.batchNo || '', workshop: dr.workshop || '', process: dr.process || '',
-    discoverTime: dr.discoverTime || '', foreignType: dr.foreignType || '', discoverer: dr.discoverer || '',
-    riskLevel: dr.riskLevel || '', description: dr.description || '', sourceAnalysis: dr.sourceAnalysis || '',
-    handleMeasure: dr.handleMeasure || '', handleResult: dr.handleResult || '待处理',
-    responsible: dr.responsible || '', rectification: dr.rectification || '', remark: dr.remark || ''
+    productName: dr.productName || dr.product_name || '',
+    batchNo: dr.batchNo || dr.batch_no || '',
+    workshop: dr.workshop || '',
+    process: dr.process || '',
+    discoverTime: dr.discoverTime || dr.discover_time || '',
+    foreignType: dr.foreignType || dr.foreign_type || '',
+    discoverer: dr.discoverer || '',
+    riskLevel: dr.riskLevel || dr.risk_level || '',
+    description: dr.description || '',
+    sourceAnalysis: dr.sourceAnalysis || dr.source_analysis || '',
+    handleMeasure: dr.handleMeasure || dr.handle_measure || '',
+    handleResult: dr.handleResult || dr.handle_result || '待处理',
+    responsible: dr.responsible || '',
+    rectification: dr.rectification || '',
+    remark: dr.remark || ''
   };
   try {
     await saveRecordToDB(record);
+    // 从数据库中删除已恢复的记录
+    if (dr.id) {
+      await sbClient.from('deleted_records').delete().eq('id', dr.id);
+    }
     deletedRecords.splice(index, 1);
-    saveDeletedRecords();
     addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 工序:' + (record.process||'-') + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer + ', 风险:' + (record.riskLevel||'-') + ', 时间:' + (record.discoverTime||'-'));
     await loadData(true);
     populateMonthFilters();
     renderDeletedRecords();
     toast('记录已恢复');
-  } catch(err) { toast('恢复失败: ' + err.message, 'error'); }
+  } catch(err) {
+    console.error('恢复记录失败:', err);
+    toast('恢复失败: ' + err.message, 'error');
+  }
 }
 
-function permanentlyDeleteRecord(index) {
+async function permanentlyDeleteRecord(index) {
   const dr = deletedRecords[index];
   if (!dr) return;
-  deletedRecords.splice(index, 1);
-  saveDeletedRecords();
-  addLog('永久删除', '产品:' + dr.productName + ', 批号:' + (dr.batchNo||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + dr.foreignType + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel||'-') + ', 时间:' + (dr.discoverTime||'-'));
-  renderDeletedRecords();
-  toast('已永久删除');
+  if (!isExpired(dr)) {
+    const remaining = getRemainingDays(dr);
+    toast('记录删除未满7天，还需 ' + remaining + ' 天才能永久删除', 'error');
+    return;
+  }
+  try {
+    if (dr.id) {
+      await sbClient.from('deleted_records').delete().eq('id', dr.id);
+    }
+    deletedRecords.splice(index, 1);
+    addLog('永久删除', '产品:' + (dr.productName || dr.product_name) + ', 批号:' + ((dr.batchNo || dr.batch_no)||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + (dr.foreignType || dr.foreign_type) + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel || dr.risk_level||'-') + ', 时间:' + (dr.discoverTime || dr.discover_time||'-'));
+    renderDeletedRecords();
+    toast('已永久删除');
+  } catch(e) {
+    console.error('永久删除失败:', e);
+    toast('删除失败', 'error');
+  }
 }
 
-function batchPermanentlyDelete() {
+async function batchPermanentlyDelete() {
   const checked = document.querySelectorAll('.deleted-checkbox:checked');
   if (checked.length === 0) { toast('请先选择要删除的记录', 'error'); return; }
-  showConfirm('批量永久删除', `确定要永久删除选中的 ${checked.length} 条记录吗？此操作不可恢复！`, () => {
-    const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index)).sort((a,b) => b-a);
-    indices.forEach(i => {
+  // 检查是否有未过期的记录
+  const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index));
+  const notExpired = indices.filter(i => deletedRecords[i] && !isExpired(deletedRecords[i]));
+  if (notExpired.length > 0) {
+    toast('选中的记录中有 ' + notExpired.length + ' 条删除未满7天，无法永久删除', 'error');
+    return;
+  }
+  showConfirm('批量永久删除', `确定要永久删除选中的 ${checked.length} 条记录吗？此操作不可恢复！`, async () => {
+    const sortedIndices = indices.sort((a,b) => b-a);
+    for (const i of sortedIndices) {
       const dr = deletedRecords[i];
-      if (dr) addLog('永久删除', '产品:' + dr.productName + ', 批号:' + (dr.batchNo||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + dr.foreignType + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel||'-') + ', 时间:' + (dr.discoverTime||'-'));
-      deletedRecords.splice(i, 1);
-    });
-    saveDeletedRecords();
+      if (dr) {
+        try {
+          if (dr.id) {
+            await sbClient.from('deleted_records').delete().eq('id', dr.id);
+          }
+          addLog('永久删除', '产品:' + (dr.productName || dr.product_name) + ', 批号:' + ((dr.batchNo || dr.batch_no)||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + (dr.foreignType || dr.foreign_type) + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel || dr.risk_level||'-') + ', 时间:' + (dr.discoverTime || dr.discover_time||'-'));
+          deletedRecords.splice(i, 1);
+        } catch(e) {
+          console.error('批量删除失败:', e);
+        }
+      }
+    }
     renderDeletedRecords();
     toast(`已永久删除 ${checked.length} 条记录`);
   });
@@ -574,8 +703,9 @@ function renderOpLog() {
   
   // 设置表格样式
   const table = document.getElementById('oplogTable');
-  table.style.tableLayout = 'fixed';
+  table.style.tableLayout = 'auto';
   table.style.width = '100%';
+  table.style.minWidth = '600px';
   
   // 设置表头样式
   const thead = table.querySelector('thead tr');
@@ -584,9 +714,9 @@ function renderOpLog() {
     if (ths.length >= 4) {
       ths[0].style.width = '60px';
       ths[0].style.textAlign = 'center';
-      ths[1].style.width = '160px';
-      ths[2].style.width = '140px';
-      ths[3].style.width = 'auto'; // 详情列占据剩余空间
+      ths[1].style.width = '150px';
+      ths[2].style.width = '120px';
+      ths[3].style.minWidth = '250px';
     }
   }
   
@@ -609,7 +739,7 @@ function renderOpLog() {
       '<td style="text-align:center;font-weight:600;color:var(--text2)">' + (i + 1) + '</td>' +
       '<td style="white-space:nowrap;font-size:12px;color:var(--text2)">' + time + '</td>' +
       '<td><span class="' + actionClass + '">' + icon + ' ' + action + '</span></td>' +
-      '<td style="white-space:normal;word-wrap:break-word;word-break:break-all;overflow-wrap:break-word;font-size:13px;line-height:1.6;color:var(--text);padding:8px 12px">' + detail + '</td></tr>';
+      '<td style="white-space:normal;word-wrap:break-word;overflow-wrap:break-word;font-size:13px;line-height:1.6;color:var(--text);padding:8px 12px;min-width:200px">' + detail + '</td></tr>';
   });
   if (operationLogs.length === 0) html = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text2)">暂无操作日志</td></tr>';
   document.querySelector('#oplogTable tbody').innerHTML = html;
@@ -2274,8 +2404,8 @@ async function init() {
   updateClock();
   setInterval(updateClock, 60000);
   
-  loadDeletedRecords();
-  loadOperationLogs();
+  await loadDeletedRecords();
+  await loadOperationLogs();
   
   try {
     await loadData();
