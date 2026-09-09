@@ -141,12 +141,12 @@ tr:hover{background:#f8fafc}
 .dashboard-stats .stat-icon{width:36px;height:36px;font-size:18px}
 .dashboard-stats .stat-info h3{font-size:18px}
 .dashboard-stats .stat-info p{font-size:11px}
-#typeStatsContainer>div>div:last-child{display:flex!important;overflow-x:auto;gap:10px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-#typeStatsContainer>div>div:last-child>div{min-width:110px;flex-shrink:0}
-#workshopStatsContainer>div{display:flex!important;overflow-x:auto;gap:8px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-#workshopStatsContainer>div>div{min-width:100px;flex-shrink:0}
-#riskStatsContainer>div{display:flex!important;overflow-x:auto;gap:8px!important;padding-bottom:8px;-webkit-overflow-scrolling:touch}
-#riskStatsContainer>div>div{min-width:90px;flex-shrink:0}
+#typeStatsContainer>div>div:last-child{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+#typeStatsContainer>div>div:last-child>div{min-width:auto!important;flex-shrink:1!important}
+#workshopStatsContainer>div{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+#workshopStatsContainer>div>div{min-width:auto!important;flex-shrink:1!important}
+#riskStatsContainer>div{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+#riskStatsContainer>div>div{min-width:auto!important;flex-shrink:1!important}
 #oplogTable{table-layout:auto!important;min-width:600px}
 #oplogTable td:last-child{white-space:normal!important;word-break:break-word!important;min-width:200px}
 .card{padding:14px}
@@ -1024,18 +1024,25 @@ function renderTypeStats(filtered) {
   filtered.forEach(r => { typeCount[r.foreignType] = (typeCount[r.foreignType] || 0) + 1; });
   const sorted = Object.entries(typeCount).sort((a, b) => b[1] - a[1]);
   const total = filtered.length;
+  const isMobile = window.innerWidth <= 768;
+  const cols = isMobile ? 2 : sorted.length;
   
   let html = '<div class="card" style="margin-bottom:20px"><div class="card-header"><span class="card-title">🔍 异物类型占比分析</span><span class="card-subtitle">共 ' + sorted.length + ' 种</span></div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(' + sorted.length + ',1fr);gap:10px">';
+  html += '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:' + (isMobile ? '8px' : '10px') + '">';
   sorted.forEach(([type, count], i) => {
     const color = getTypeColor(type);
     const pct = total ? (count / total * 100).toFixed(1) : 0;
-    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:12px">' +
-      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div style="width:24px;height:24px;border-radius:50%;background:' + color + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">' + (i+1) + '</div>' +
-      '<div style="font-size:12px;font-weight:600;color:' + color + '">' + type + '</div></div>' +
-      '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px"><span style="font-size:24px;font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:11px;color:var(--text2)">件</span></div>' +
-      '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px"></div></div>' +
-      '<span style="font-size:13px;font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
+    const padding = isMobile ? '10px' : '12px';
+    const fontSize = isMobile ? '11px' : '12px';
+    const numSize = isMobile ? '20px' : '24px';
+    const pctSize = isMobile ? '12px' : '13px';
+    const barHeight = isMobile ? '4px' : '5px';
+    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:' + padding + '">' +
+      '<div style="display:flex;align-items:center;gap:' + (isMobile ? '8px' : '12px') + ';margin-bottom:' + (isMobile ? '8px' : '12px') + '"><div style="width:' + (isMobile ? '20px' : '24px') + ';height:' + (isMobile ? '20px' : '24px') + ';border-radius:50%;background:' + color + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:' + (isMobile ? '10px' : '11px') + '">' + (i+1) + '</div>' +
+      '<div style="font-size:' + fontSize + ';font-weight:600;color:' + color + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + type + '">' + type + '</div></div>' +
+      '<div style="display:flex;align-items:baseline;gap:' + (isMobile ? '6px' : '8px') + ';margin-bottom:' + (isMobile ? '6px' : '8px') + '"><span style="font-size:' + numSize + ';font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:' + (isMobile ? '10px' : '11px') + ';color:var(--text2)">件</span></div>' +
+      '<div style="display:flex;align-items:center;gap:' + (isMobile ? '6px' : '8px') + '"><div style="flex:1;height:' + barHeight + ';background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:' + (isMobile ? '2px' : '4px') + '"></div></div>' +
+      '<span style="font-size:' + pctSize + ';font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
   });
   html += '</div></div>';
   document.getElementById('typeStatsContainer').innerHTML = html;
@@ -1046,16 +1053,23 @@ function renderWorkshopStats(filtered) {
   filtered.forEach(r => { wsCount[r.workshop] = (wsCount[r.workshop] || 0) + 1; });
   const sorted = Object.entries(wsCount).sort((a, b) => b[1] - a[1]);
   const total = filtered.length;
+  const isMobile = window.innerWidth <= 768;
+  const cols = isMobile ? 2 : sorted.length;
   
-  let html = '<div style="display:grid;grid-template-columns:repeat(' + sorted.length + ',1fr);gap:8px">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:' + (isMobile ? '8px' : '8px') + '">';
   sorted.forEach(([ws, count], i) => {
     const color = getWorkshopColor(ws);
     const pct = total ? (count / total * 100).toFixed(1) : 0;
-    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:10px">' +
-      '<div style="font-size:12px;font-weight:600;color:' + color + ';margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + ws + '">' + ws + '</div>' +
-      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px"><span style="font-size:20px;font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:11px;color:var(--text2)">件</span></div>' +
-      '<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px"></div></div>' +
-      '<span style="font-size:12px;font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
+    const padding = isMobile ? '8px' : '10px';
+    const fontSize = isMobile ? '11px' : '12px';
+    const numSize = isMobile ? '18px' : '20px';
+    const pctSize = isMobile ? '11px' : '12px';
+    const barHeight = isMobile ? '4px' : '5px';
+    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:' + padding + '">' +
+      '<div style="font-size:' + fontSize + ';font-weight:600;color:' + color + ';margin-bottom:' + (isMobile ? '6px' : '8px') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + ws + '">' + ws + '</div>' +
+      '<div style="display:flex;align-items:baseline;gap:' + (isMobile ? '4px' : '6px') + ';margin-bottom:' + (isMobile ? '4px' : '6px') + '"><span style="font-size:' + numSize + ';font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:' + (isMobile ? '10px' : '11px') + ';color:var(--text2)">件</span></div>' +
+      '<div style="display:flex;align-items:center;gap:' + (isMobile ? '4px' : '6px') + '"><div style="flex:1;height:' + barHeight + ';background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:' + (isMobile ? '2px' : '3px') + '"></div></div>' +
+      '<span style="font-size:' + pctSize + ';font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
   });
   html += '</div>';
   document.getElementById('workshopStatsContainer').innerHTML = html;
@@ -1065,18 +1079,26 @@ function renderRiskStats(filtered) {
   const riskCount = { '低风险': 0, '中风险': 0, '高风险': 0, '重大风险': 0, '未评估': 0 };
   filtered.forEach(r => { riskCount[r.riskLevel || '未评估'] = (riskCount[r.riskLevel || '未评估'] || 0) + 1; });
   const total = filtered.length;
-  const riskIcons = { '低风险': '🟢', '中风险': '🟡', '高风险': '🟠', '重大风险': '🔴', '未评估': '⬜' };
+  const riskIcons = { '低风险': '🟢', '中风险': '🟡', '高风险': '🟠', '重大风险': '', '未评估': '⬜' };
   const activeRisks = Object.entries(riskCount).filter(e => e[1] > 0);
+  const isMobile = window.innerWidth <= 768;
+  const cols = isMobile ? 2 : activeRisks.length;
   
-  let html = '<div style="display:grid;grid-template-columns:repeat(' + activeRisks.length + ',1fr);gap:8px">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:' + (isMobile ? '8px' : '8px') + '">';
   activeRisks.forEach(([level, count]) => {
     const color = getRiskColor(level);
     const pct = total ? (count / total * 100).toFixed(1) : 0;
-    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:10px">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:14px">' + riskIcons[level] + '</span><span style="font-size:12px;font-weight:600;color:' + color + '">' + level + '</span></div>' +
-      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px"><span style="font-size:20px;font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:11px;color:var(--text2)">件</span></div>' +
-      '<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px"></div></div>' +
-      '<span style="font-size:12px;font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
+    const padding = isMobile ? '8px' : '10px';
+    const iconSize = isMobile ? '12px' : '14px';
+    const fontSize = isMobile ? '11px' : '12px';
+    const numSize = isMobile ? '18px' : '20px';
+    const pctSize = isMobile ? '11px' : '12px';
+    const barHeight = isMobile ? '4px' : '5px';
+    html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:' + padding + '">' +
+      '<div style="display:flex;align-items:center;gap:' + (isMobile ? '6px' : '8px') + ';margin-bottom:' + (isMobile ? '6px' : '8px') + '"><span style="font-size:' + iconSize + '">' + riskIcons[level] + '</span><span style="font-size:' + fontSize + ';font-weight:600;color:' + color + '">' + level + '</span></div>' +
+      '<div style="display:flex;align-items:baseline;gap:' + (isMobile ? '4px' : '6px') + ';margin-bottom:' + (isMobile ? '4px' : '6px') + '"><span style="font-size:' + numSize + ';font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:' + (isMobile ? '10px' : '11px') + ';color:var(--text2)">件</span></div>' +
+      '<div style="display:flex;align-items:center;gap:' + (isMobile ? '4px' : '6px') + '"><div style="flex:1;height:' + barHeight + ';background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:' + (isMobile ? '2px' : '3px') + '"></div></div>' +
+      '<span style="font-size:' + pctSize + ';font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
   });
   html += '</div>';
   document.getElementById('riskStatsContainer').innerHTML = html;
