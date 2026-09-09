@@ -481,11 +481,17 @@ async function loadDeletedRecords() {
   try {
     const { data, error } = await sbClient.from('deleted_records').select('*').order('deleted_at', { ascending: false });
     if (error) throw error;
-    deletedRecords = (data || []).map(r => ({
-      ...r,
-      deletedAt: new Date(r.deleted_at).getTime()
-    }));
-    cleanExpiredDeleted();
+    deletedRecords = (data || []).map(r => {
+      // 确保 deletedAt 是有效的时间戳，如果 deleted_at 为 null 或无效，使用当前时间
+      const deletedAtTime = r.deleted_at ? new Date(r.deleted_at).getTime() : Date.now();
+      const isValidTime = !isNaN(deletedAtTime) && deletedAtTime > 0;
+      return {
+        ...r,
+        deletedAt: isValidTime ? deletedAtTime : Date.now()
+      };
+    });
+    // 正确等待清理完成
+    await cleanExpiredDeleted();
   } catch(e) {
     console.error('加载最近删除失败:', e);
     deletedRecords = [];
@@ -497,18 +503,28 @@ async function saveDeletedRecords() {
 async function cleanExpiredDeleted() {
   const now = Date.now();
   const sevenDays = 7*24*60*60*1000;
-  const expired = deletedRecords.filter(r => (now - r.deletedAt) >= sevenDays);
+  // 只清理真正过期的记录（deletedAt 必须是有效时间戳）
+  const expired = deletedRecords.filter(r => {
+    if (!r.deletedAt || isNaN(r.deletedAt) || r.deletedAt <= 0) return false;
+    return (now - r.deletedAt) >= sevenDays;
+  });
   if (expired.length > 0) {
-    const expiredIds = expired.map(r => r.id);
-    try {
-      await sbClient.from('deleted_records').delete().in('id', expiredIds);
-    } catch(e) {
-      console.error('清理过期删除记录失败:', e);
+    const expiredIds = expired.map(r => r.id).filter(id => id != null);
+    if (expiredIds.length > 0) {
+      try {
+        await sbClient.from('deleted_records').delete().in('id', expiredIds);
+      } catch(e) {
+        console.error('清理过期删除记录失败:', e);
+      }
     }
   }
-  deletedRecords = deletedRecords.filter(r => (now - r.deletedAt) < sevenDays);
+  // 保留有效记录（deletedAt 无效的记录也保留，避免误删）
+  deletedRecords = deletedRecords.filter(r => {
+    if (!r.deletedAt || isNaN(r.deletedAt) || r.deletedAt <= 0) return true;
+    return (now - r.deletedAt) < sevenDays;
+  });
 }
-function getRemainingDays(rec) { const now = Date.now(); const sevenDays = 7*24*60*60*1000; return Math.max(0, Math.ceil((sevenDays - (now - rec.deletedAt)) / (24*60*60*1000))); }
+function getRemainingDays(rec) { const now = Date.now(); const sevenDays = 7*24*60*60*1000; if (!rec.deletedAt || isNaN(rec.deletedAt) || rec.deletedAt <= 0) return 7; return Math.max(0, Math.ceil((sevenDays - (now - rec.deletedAt)) / (24*60*60*1000))); }
 function isExpired(rec) { return getRemainingDays(rec) <= 0; }
 
 async function moveToDeleted(id) {
@@ -652,8 +668,8 @@ function updateDeletedBatchActions() {
 }
 
 function renderDeletedRecords() {
-  cleanExpiredDeleted();
-  let batchHtml = '<div id="deletedBatchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="deletedSelectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAllDeleted()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAllDeleted()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchPermanentlyDelete()">🗑️ 批量永久删除</button></div></div></div>';
+  // 清理已在 loadDeletedRecords 中完成，这里只负责渲染
+  let batchHtml = '<div id="deletedBatchActions" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="font-size:14px;color:#1e40af"><span id="deletedSelectedCount">0</span> 条记录已选择</div><div style="display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="selectAllDeleted()">全选</button><button class="btn btn-sm btn-outline" onclick="deselectAllDeleted()">取消全选</button><button class="btn btn-sm btn-danger" onclick="batchPermanentlyDelete()">️ 批量永久删除</button></div></div></div>';
   let html = '';
   deletedRecords.forEach((r, i) => {
     const expired = isExpired(r);
