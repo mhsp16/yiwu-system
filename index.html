@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1024, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=0.4, maximum-scale=3.0, user-scalable=yes">
 <title>食品生产车间异物发现统计分析系统</title>
 <script src="supabase.js"></script>
 <script src="chart.umd.min.js"></script>
@@ -84,6 +84,8 @@ tr:hover{background:#f8fafc}
 .toast-success{background:var(--success)}.toast-error{background:var(--danger)}.toast-info{background:var(--info)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .menu-toggle{display:none;background:none;border:none;font-size:24px;cursor:pointer}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+.sidebar-overlay.show{display:block}
 .config-list{display:flex;flex-wrap:wrap;gap:8px}
 .config-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f1f5f9;border-radius:20px;font-size:13px}
 .config-tag .remove{cursor:pointer;color:var(--danger);font-weight:bold}
@@ -125,7 +127,7 @@ tr:hover{background:#f8fafc}
 
 
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
-@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:8px}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}
+@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-overlay.show{display:block}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:8px}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}
 .dashboard-stats .stat-card{padding:10px;gap:8px}
 .dashboard-stats .stat-icon{width:36px;height:36px;font-size:18px}
 .dashboard-stats .stat-info h3{font-size:18px}
@@ -140,7 +142,14 @@ tr:hover{background:#f8fafc}
 #oplogTable td:last-child{white-space:normal!important;word-break:break-word!important;min-width:200px}
 .card{padding:14px}
 .card-header{flex-direction:column;align-items:flex-start;gap:4px}
-.content{padding:12px}}
+.content{padding:12px}
+.table-wrapper{overflow-x:auto}
+table{font-size:12px}
+th,td{padding:8px 6px}
+.stat-card{padding:12px;gap:10px}
+.stat-icon{width:40px;height:40px;font-size:20px}
+.stat-info h3{font-size:20px}
+.stat-info p{font-size:11px}}
 @media print{.sidebar,.topbar{display:none}.main{margin-left:0}.card{box-shadow:none;border:1px solid #ddd}}
 
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(2px)}
@@ -184,9 +193,10 @@ tr.today-row td:first-child{font-weight:600}
 <div class="nav-item" data-page="import-export"><span class="icon">📤</span>导入导出</div>
 </nav>
 </aside>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('show')"></div>
 <div class="main">
 <div class="topbar">
-<div class="topbar-left"><button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button><h2 id="pageTitle">数据看板</h2></div>
+<div class="topbar-left"><button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('show')">☰</button><h2 id="pageTitle">数据看板</h2></div>
 <div class="topbar-right"><span style="font-size:13px;color:var(--text2)" id="currentTime"></span><button class="btn btn-primary btn-sm" onclick="showPage('entry')">＋ 快速录入</button></div>
 </div>
 <div class="content">
@@ -938,6 +948,7 @@ function showPage(pageId) {
   else if (pageId === 'config') renderConfig();
   else if (pageId.startsWith('analysis-')) renderAnalysis(pageId.replace('analysis-',''));
   document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
   window.scrollTo(0, 0);
 }
 
