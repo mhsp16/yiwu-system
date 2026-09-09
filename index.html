@@ -281,9 +281,11 @@ tr.today-row td:first-child{font-weight:600}
 <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 <button class="btn btn-primary" onclick="addBatchRow()">＋ 添加一行</button>
 <button class="btn btn-success" onclick="submitBatch()"> 批量提交</button>
+<button class="btn btn-warning" id="clearFailedBtn" onclick="clearFailedRows()" style="display:none">🗑️ 清除失败记录</button>
 <button class="btn btn-outline" onclick="clearBatch()">🗑️ 清空列表</button>
 <span id="batchCount" style="font-size:13px;color:var(--text2);margin-left:8px">共 0 条待提交</span>
 </div>
+<div id="batchResultSummary" style="display:none;margin-bottom:12px;padding:12px 16px;border-radius:8px;font-size:13px"></div>
 <div class="table-wrapper">
 <table id="batchTable">
 <thead><tr>
@@ -2175,8 +2177,22 @@ function renderBatchTable() {
     const riskOpts = riskLevels.map(r => '<option value="'+r+'"'+(r===row.riskLevel?' selected':'')+'>'+r+'</option>').join('');
     const resultOpts = ['待处理','已处理','已关闭'].map(s => '<option value="'+s+'"'+(s===row.handleResult?' selected':'')+'>'+s+'</option>').join('');
 
-    html += '<tr>' +
-      '<td><button class="btn btn-sm btn-danger" onclick="removeBatchRow('+idx+')"></button></td>' +
+    const status = row._status || '';
+    let rowStyle = '';
+    let statusIcon = '';
+    if (status === 'success') {
+      rowStyle = 'background:#f0fdf4 !important;opacity:0.5;';
+      statusIcon = '✅';
+    } else if (status === 'failed') {
+      rowStyle = 'background:#fef2f2 !important;';
+      statusIcon = '<span title="' + (row._error || '').replace(/"/g, '&quot;') + '">❌</span>';
+    } else if (status === 'submitting') {
+      rowStyle = 'background:#eff6ff !important;';
+      statusIcon = '⏳';
+    }
+
+    html += '<tr style="' + rowStyle + '">' +
+      '<td>' + (status === 'success' ? statusIcon : statusIcon + ' <button class="btn btn-sm btn-danger" onclick="removeBatchRow('+idx+')" style="padding:2px 6px;font-size:11px">✕</button>') + '</td>' +
       '<td>' + (idx+1) + '</td>' +
       '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'productName\',this.value)"><option value="">请选择</option>' + productOpts + '</select></td>' +
       '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.batchNo||'')+'" onchange="updateBatchRow('+idx+',\'batchNo\',this.value)" placeholder="批号"></td>' +
@@ -2194,9 +2210,13 @@ function renderBatchTable() {
       '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.rectification||'')+'" onchange="updateBatchRow('+idx+',\'rectification\',this.value)" placeholder="整改"></td>' +
       '<td><input class="form-input" style="min-width:80px;padding:4px 8px;font-size:12px" value="'+(row.remark||'')+'" onchange="updateBatchRow('+idx+',\'remark\',this.value)" placeholder="备注"></td>' +
       '</tr>';
+    if (status === 'failed' && row._error) {
+      html += '<tr style="background:#fef2f2"><td colspan="17" style="padding:4px 12px;font-size:11px;color:#dc2626;border-bottom:2px solid #fecaca">❌ 提交失败：' + row._error.replace(/</g, '&lt;') + '</td></tr>';
+    }
   });
   tbody.innerHTML = html;
-  document.getElementById('batchCount').textContent = '共 ' + batchRows.length + ' 条待提交';
+  const pendingCount = batchRows.filter(r => r._status !== 'success').length;
+  document.getElementById('batchCount').textContent = '共 ' + pendingCount + ' 条待提交';
 }
 
 function updateBatchRow(idx, field, value) {
@@ -2224,6 +2244,7 @@ async function submitBatch() {
   
   const invalid = [];
   batchRows.forEach((row, idx) => {
+    if (row._status === 'success') return;
     if (!row.productName) invalid.push('第'+(idx+1)+'行: 产品名称');
     if (!row.workshop) invalid.push('第'+(idx+1)+'行: 车间');
     if (!row.discoverTime) invalid.push('第'+(idx+1)+'行: 发现时间');
@@ -2238,15 +2259,30 @@ async function submitBatch() {
   const progress = document.getElementById('batchProgress');
   const progressBar = document.getElementById('batchProgressBar');
   const progressText = document.getElementById('batchProgressText');
+  const summaryDiv = document.getElementById('batchResultSummary');
   progress.style.display = 'block';
+  if (summaryDiv) summaryDiv.style.display = 'none';
+  
+  // Mark all non-success rows as pending
+  batchRows.forEach(row => { if (row._status !== 'success') { row._status = ''; row._error = ''; } });
+  renderBatchTable();
   
   let success = 0, failed = 0;
-  const total = batchRows.length;
+  const total = batchRows.filter(r => r._status !== 'success').length;
+  const successItems = [];
+  const failedItems = [];
+  let processed = 0;
   
   for (let i = 0; i < batchRows.length; i++) {
     const row = batchRows[i];
-    progressText.textContent = '正在提交 ' + (i+1) + '/' + total + '...';
-    progressBar.style.width = ((i+1)/total*100) + '%';
+    if (row._status === 'success') continue;
+    
+    processed++;
+    progressText.textContent = '正在提交 ' + processed + '/' + total + '...';
+    progressBar.style.width = (processed/total*100) + '%';
+    
+    row._status = 'submitting';
+    renderBatchTable();
     
     try {
       const record = {
@@ -2269,10 +2305,18 @@ async function submitBatch() {
       };
       await saveRecordToDB(record);
       success++;
+      row._status = 'success';
+      successItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer });
     } catch (err) {
       failed++;
+      row._status = 'failed';
+      row._error = err.message || '未知错误';
+      failedItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer, error: err.message || '未知错误' });
       console.error('Batch submit row ' + (i+1) + ' error:', err);
     }
+    renderBatchTable();
+    
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
   
   await loadData(true);
@@ -2286,16 +2330,81 @@ async function submitBatch() {
   progressBar.style.width = '100%';
   progressBar.style.background = failed > 0 ? '#f59e0b' : '#16a34a';
   
-  toast('批量提交完成：成功 ' + success + ' 条' + (failed > 0 ? '，失败 ' + failed + ' 条' : ''), failed > 0 ? 'error' : 'success');
+  // Show/hide clear failed button
+  const clearFailedBtn = document.getElementById('clearFailedBtn');
+  if (clearFailedBtn) clearFailedBtn.style.display = failed > 0 ? '' : 'none';
   
-  if (failed === 0) {
-    batchRows = [];
-    setTimeout(function() {
-      renderBatchTable();
-      progress.style.display = 'none';
-      progressBar.style.width = '0%';
-    }, 2000);
+  // Show result summary bar
+  if (summaryDiv) {
+    summaryDiv.style.display = 'block';
+    if (failed > 0) {
+      summaryDiv.style.background = '#fef2f2';
+      summaryDiv.style.border = '1px solid #fecaca';
+      summaryDiv.innerHTML = '<span style="font-weight:600;color:#991b1b">⚠️ 提交结果：成功 ' + success + ' 条，失败 ' + failed + ' 条</span><br><span style="color:#64748b;font-size:12px">失败记录已保留在表格中（标红显示），可修正后重新提交。成功记录已自动移除。</span>';
+      toast('成功 ' + success + ' 条，失败 ' + failed + ' 条，失败记录已保留', 'error');
+    } else {
+      summaryDiv.style.background = '#f0fdf4';
+      summaryDiv.style.border = '1px solid #bbf7d0';
+      summaryDiv.innerHTML = '<span style="font-weight:600;color:#166534">✅ 全部提交成功！共 ' + success + ' 条记录已保存。</span>';
+      toast('全部提交成功！共 ' + success + ' 条');
+    }
   }
+  
+  // Remove successful rows, keep failed rows
+  batchRows = batchRows.filter(r => r._status !== 'success');
+  renderBatchTable();
+  
+  // Show detailed result modal
+  showBatchResultModal(successItems, failedItems);
+  
+  setTimeout(function() {
+    progress.style.display = 'none';
+    progressBar.style.width = '0%';
+  }, 3000);
+}
+
+function showBatchResultModal(successItems, failedItems) {
+  let html = '<div style="max-height:60vh;overflow-y:auto">';
+  
+  if (successItems.length > 0) {
+    html += '<div style="margin-bottom:16px"><h4 style="color:#166534;font-size:14px;margin-bottom:8px">✅ 成功提交 (' + successItems.length + '条)</h4>';
+    html += '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#f0fdf4"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">#</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">产品</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">车间</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">类型</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">发现人</th></tr></thead><tbody>';
+    successItems.forEach(function(item) {
+      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + item.product + '</td><td style="padding:4px 8px">' + item.workshop + '</td><td style="padding:4px 8px">' + item.type + '</td><td style="padding:4px 8px">' + item.discoverer + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  
+  if (failedItems.length > 0) {
+    html += '<div><h4 style="color:#991b1b;font-size:14px;margin-bottom:8px">❌ 提交失败 (' + failedItems.length + '条)</h4>';
+    html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;color:#991b1b">💡 失败记录已保留在批量录入表格中（标红显示），可修正后重新提交</div>';
+    html += '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#fef2f2"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">#</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">产品</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">车间</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">类型</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">发现人</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">错误原因</th></tr></thead><tbody>';
+    failedItems.forEach(function(item) {
+      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + item.product + '</td><td style="padding:4px 8px">' + item.workshop + '</td><td style="padding:4px 8px">' + item.type + '</td><td style="padding:4px 8px">' + item.discoverer + '</td><td style="padding:4px 8px;color:#dc2626">' + item.error + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  
+  html += '</div>';
+  
+  document.getElementById('detailTitle').textContent = '批量提交结果';
+  document.getElementById('detailBody').innerHTML = html;
+  const editBtn = document.getElementById('detailEditBtn');
+  editBtn.textContent = '知道了';
+  editBtn.onclick = function() { closeModal('detailModal'); editBtn.textContent = '编辑'; };
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function clearFailedRows() {
+  const failedCount = batchRows.filter(r => r._status === 'failed').length;
+  if (failedCount === 0) { toast('没有失败记录', 'info'); return; }
+  batchRows = batchRows.filter(function(r) { return r._status !== 'failed'; });
+  const clearFailedBtn = document.getElementById('clearFailedBtn');
+  if (clearFailedBtn) clearFailedBtn.style.display = 'none';
+  const summaryDiv = document.getElementById('batchResultSummary');
+  if (summaryDiv) summaryDiv.style.display = 'none';
+  renderBatchTable();
+  toast('已清除 ' + failedCount + ' 条失败记录');
 }
 
 // ============ INIT ============
