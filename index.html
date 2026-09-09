@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <title>食品生产车间异物发现统计分析系统</title>
 <script src="supabase.js"></script>
 <script src="chart.umd.min.js"></script>
@@ -44,6 +44,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 .stat-info h3{font-size:24px;font-weight:700}.stat-info p{font-size:13px;color:var(--text2)}
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;margin-bottom:24px}
 .chart-container{position:relative;height:300px}
+@media(max-width:768px){.chart-container{height:250px}}
+@media(max-width:480px){.chart-container{height:220px}}
 .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
@@ -125,7 +127,16 @@ tr:hover{background:#f8fafc}
 
 
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
-@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.menu-toggle{display:block}.charts-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:8px}.form-grid{grid-template-columns:1fr}.chart-container{height:250px}
+@media(max-width:768px){
+.sidebar{transform:translateX(-100%)}
+.sidebar.open{transform:translateX(0)}
+.main{margin-left:0}
+.menu-toggle{display:block}
+.charts-grid{grid-template-columns:1fr}
+.stats-grid{grid-template-columns:repeat(2,1fr)}
+.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:8px}
+.form-grid{grid-template-columns:1fr}
+.chart-container{height:250px}
 .dashboard-stats .stat-card{padding:10px;gap:8px}
 .dashboard-stats .stat-icon{width:36px;height:36px;font-size:18px}
 .dashboard-stats .stat-info h3{font-size:18px}
@@ -140,7 +151,34 @@ tr:hover{background:#f8fafc}
 #oplogTable td:last-child{white-space:normal!important;word-break:break-word!important;min-width:200px}
 .card{padding:14px}
 .card-header{flex-direction:column;align-items:flex-start;gap:4px}
-.content{padding:12px}}
+.content{padding:12px}
+.stat-card{padding:14px;gap:10px}
+.stat-icon{width:40px;height:40px;font-size:20px}
+.stat-info h3{font-size:20px}
+.stat-info p{font-size:11px}
+table{font-size:12px}
+th,td{padding:8px 10px}
+.btn{padding:6px 12px;font-size:12px}
+.btn-sm{padding:3px 8px;font-size:11px}
+.form-input,.form-select,.form-textarea{font-size:13px;padding:6px 10px}
+.topbar{padding:10px 16px}
+.topbar-left h2{font-size:13px}
+.filter-bar{gap:8px}
+.filter-bar .form-input,.filter-bar .form-select{font-size:12px;padding:5px 8px}
+}
+@media(max-width:480px){
+.dashboard-stats{grid-template-columns:1fr}
+.stats-grid{grid-template-columns:1fr}
+.chart-container{height:220px}
+.content{padding:10px}
+.card{padding:12px;margin-bottom:12px}
+.stat-card{padding:12px;gap:8px}
+.stat-icon{width:36px;height:36px;font-size:18px}
+.stat-info h3{font-size:18px}
+.stat-info p{font-size:10px}
+table{font-size:11px}
+th,td{padding:6px 8px}
+}
 @media print{.sidebar,.topbar{display:none}.main{margin-left:0}.card{box-shadow:none;border:1px solid #ddd}}
 
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(2px)}
@@ -1103,10 +1141,20 @@ function renderPieChart(canvasId, labels, data, customColors) {
   if (!ctx) return;
   if (charts[canvasId]) charts[canvasId].destroy();
   const colors = customColors || TYPE_PALETTE;
+  const isMobile = window.innerWidth <= 768;
   charts[canvasId] = new Chart(ctx, {
     type: 'pie',
     data: { labels, datasets: [{ data, backgroundColor: colors }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: isMobile ? 'bottom' : 'right',
+          labels: { font: { size: isMobile ? 10 : 12 }, padding: isMobile ? 8 : 15 }
+        }
+      }
+    }
   });
 }
 
@@ -1115,10 +1163,19 @@ function renderBarChart(canvasId, labels, data, customColors) {
   if (!ctx) return;
   if (charts[canvasId]) charts[canvasId].destroy();
   const bgColors = customColors || labels.map(() => '#2563eb');
+  const isMobile = window.innerWidth <= 768;
   charts[canvasId] = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets: [{ label: '数量', data, backgroundColor: bgColors }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: isMobile ? 10 : 12 } } },
+        x: { ticks: { font: { size: isMobile ? 9 : 11 }, maxRotation: isMobile ? 45 : 0 } }
+      }
+    }
   });
 }
 
@@ -1126,10 +1183,19 @@ function renderLineChart(canvasId, labels, data) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
   if (charts[canvasId]) charts[canvasId].destroy();
+  const isMobile = window.innerWidth <= 768;
   charts[canvasId] = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets: [{ label: '数量', data, borderColor: '#2563eb', backgroundColor: '#2563eb20', fill: true, tension: 0.4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: isMobile ? 10 : 12 } } },
+        x: { ticks: { font: { size: isMobile ? 9 : 11 }, maxRotation: isMobile ? 45 : 0 } }
+      }
+    }
   });
 }
 
