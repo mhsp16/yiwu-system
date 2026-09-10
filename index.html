@@ -477,36 +477,19 @@ async function addLog(action, detail) {
 
 // ===== 最近删除 =====
 let deletedRecords = [];
-// Convert snake_case DB row to camelCase JS object for deleted records
-function mapDeletedRow(r) {
-  const deletedAtTime = r.deleted_at ? new Date(r.deleted_at).getTime() : Date.now();
-  const isValidTime = !isNaN(deletedAtTime) && deletedAtTime > 0;
-  return {
-    id: r.id,
-    record_id: r.record_id || '',
-    productName: r.product_name || r.productName || '',
-    batchNo: r.batch_no || r.batchNo || '',
-    workshop: r.workshop || '',
-    process: r.process || '',
-    discoverTime: r.discover_time || r.discoverTime || '',
-    foreignType: r.foreign_type || r.foreignType || '',
-    discoverer: r.discoverer || '',
-    riskLevel: r.risk_level || r.riskLevel || '',
-    description: r.description || '',
-    sourceAnalysis: r.source_analysis || r.sourceAnalysis || '',
-    handleMeasure: r.handle_measure || r.handleMeasure || '',
-    handleResult: r.handle_result || r.handleResult || '待处理',
-    responsible: r.responsible || '',
-    rectification: r.rectification || '',
-    remark: r.remark || '',
-    deletedAt: isValidTime ? deletedAtTime : Date.now()
-  };
-}
 async function loadDeletedRecords() {
   try {
     const { data, error } = await sbClient.from('deleted_records').select('*').order('deleted_at', { ascending: false });
     if (error) throw error;
-    deletedRecords = (data || []).map(mapDeletedRow);
+    deletedRecords = (data || []).map(r => {
+      // 确保 deletedAt 是有效的时间戳，如果 deleted_at 为 null 或无效，使用当前时间
+      const deletedAtTime = r.deleted_at ? new Date(r.deleted_at).getTime() : Date.now();
+      const isValidTime = !isNaN(deletedAtTime) && deletedAtTime > 0;
+      return {
+        ...r,
+        deletedAt: isValidTime ? deletedAtTime : Date.now()
+      };
+    });
     // 正确等待清理完成
     await cleanExpiredDeleted();
   } catch(e) {
@@ -547,29 +530,11 @@ function isExpired(rec) { return getRemainingDays(rec) <= 0; }
 async function moveToDeleted(id) {
   const r = records.find(rec => rec.id === id || rec.client_id === id);
   if (!r) { toast('记录不存在', 'error'); return; }
-  const deletedRecord = mapDeletedRow({
-    id: null,
-    record_id: r.client_id || id,
-    product_name: r.productName || '',
-    batch_no: r.batchNo || '',
-    workshop: r.workshop || '',
-    process: r.process || '',
-    discover_time: r.discoverTime || '',
-    foreign_type: r.foreignType || '',
-    discoverer: r.discoverer || '',
-    risk_level: r.riskLevel || '',
-    description: r.description || '',
-    source_analysis: r.sourceAnalysis || '',
-    handle_measure: r.handleMeasure || '',
-    handle_result: r.handleResult || '待处理',
-    responsible: r.responsible || '',
-    rectification: r.rectification || '',
-    remark: r.remark || '',
-    deleted_at: new Date().toISOString()
-  });
+  const deletedRecord = { ...r, deletedAt: Date.now() };
+  const logDetail = '产品:' + (r.productName||'-') + ', 批号:' + (r.batchNo||'-') + ', 车间:' + (r.workshop||'-') + ', 工序:' + (r.process||'-') + ', 类型:' + (r.foreignType||'-') + ', 发现人:' + (r.discoverer||'-') + ', 风险:' + (r.riskLevel||'-') + ', 时间:' + (r.discoverTime||'-');
   try {
-    // 先插入到 deleted_records，成功后再删除主表记录
-    const { error: insertError } = await sbClient.from('deleted_records').insert([{
+    // 1. 先插入到 deleted_records 表，并获取返回数据以确认写入成功
+    const { data: insertedData, error: insertError } = await sbClient.from('deleted_records').insert([{
       record_id: r.client_id || id,
       product_name: r.productName || '',
       batch_no: r.batchNo || '',
@@ -587,15 +552,34 @@ async function moveToDeleted(id) {
       rectification: r.rectification || '',
       remark: r.remark || '',
       deleted_at: new Date().toISOString()
-    }]);
-    if (insertError) throw insertError;
-    // 插入成功后才更新本地状态并删除主表
-    deletedRecords.unshift(deletedRecord);
+    }]).select();
+
+    // 2. 检查插入是否成功，失败则中止，不删除原记录
+    if (insertError) {
+      console.error('插入deleted_records失败:', insertError);
+      toast('删除失败: ' + insertError.message, 'error');
+      return;
+    }
+    if (!insertedData || insertedData.length === 0) {
+      console.error('插入deleted_records返回空，可能被RLS策略拦截');
+      toast('删除失败: 记录未能保存到最近删除表，请检查数据库RLS策略', 'error');
+      return;
+    }
+
+    // 3. 插入成功后，才从主表删除原记录
     await deleteRecordFromDB(r.client_id || id);
-    addLog('删除记录', `产品:${r.productName||'-'}, 批号:${r.batchNo||'-'}, 车间:${r.workshop||'-'}, 工序:${r.process||'-'}, 类型:${r.foreignType||'-'}, 发现人:${r.discoverer||'-'}, 风险:${r.riskLevel||'-'}, 时间:${r.discoverTime||'-'}`);
+
+    // 4. 更新内存数组（用数据库返回的真实id）
+    const dbRecord = insertedData[0];
+    deletedRecord.id = dbRecord.id;
+    deletedRecords.unshift(deletedRecord);
+
+    // 5. 记录日志
+    addLog('删除记录', logDetail);
+    toast('记录已删除');
   } catch(e) {
     console.error('移动到最近删除失败:', e);
-    toast('删除失败: ' + (e.message || '请检查数据库deleted_records表是否存在'), 'error');
+    toast('删除失败: ' + (e.message || '未知错误'), 'error');
   }
 }
 
@@ -988,7 +972,7 @@ function showPage(pageId) {
   document.getElementById('pageTitle').textContent = titles[pageId] || pageId;
   if (pageId === 'dashboard') renderDashboard();
   else if (pageId === 'records') renderRecords();
-  else if (pageId === 'deleted') renderDeletedRecords();
+  else if (pageId === 'deleted') { loadDeletedRecords().then(() => renderDeletedRecords()); }
   else if (pageId === 'oplog') renderOpLog();
   else if (pageId === 'entry') initEntryForm();
   else if (pageId === 'batch-entry') renderBatchTable();
