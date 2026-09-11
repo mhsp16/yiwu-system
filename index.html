@@ -695,16 +695,27 @@ async function batchRestore() {
   const checked = document.querySelectorAll('.deleted-checkbox:checked');
   if (checked.length === 0) { toast('请先选择要恢复的记录', 'error'); return; }
   const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index));
-  showConfirm('批量恢复确认', `确定要恢复选中的 ${checked.length} 条记录吗？`, async () => {
+  const totalCount = indices.length;
+  showConfirm('批量恢复确认', `确定要恢复选中的 ${totalCount} 条记录吗？`, async () => {
     try {
       let successCount = 0;
+      let failCount = 0;
       const sortedIndices = indices.sort((a, b) => b - a);
-      for (const i of sortedIndices) {
+      
+      // 显示加载提示
+      const loadingEl = document.getElementById('loadingOverlay');
+      const loadingText = document.getElementById('loadingText');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      
+      for (let idx = 0; idx < sortedIndices.length; idx++) {
+        const i = sortedIndices[idx];
         const dr = deletedRecords[i];
+        if (loadingText) loadingText.textContent = `正在恢复 ${idx + 1}/${totalCount}...`;
+        
         if (dr) {
           const record = {
-            id: Date.now() + i,
-            client_id: Date.now() + i,
+            id: Date.now() + i * 10000 + idx,
+            client_id: Date.now() + i * 10000 + idx,
             productName: dr.productName || dr.product_name || '',
             batchNo: dr.batchNo || dr.batch_no || '',
             workshop: dr.workshop || '',
@@ -721,23 +732,38 @@ async function batchRestore() {
             rectification: dr.rectification || '',
             remark: dr.remark || ''
           };
-          await saveRecordToDB(record);
-          if (dr.id) {
-            await sbClient.from('deleted_records').delete().eq('id', dr.id);
+          try {
+            await saveRecordToDB(record);
+            if (dr.id) {
+              await sbClient.from('deleted_records').delete().eq('id', dr.id);
+            }
+            addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 工序:' + (record.process||'-') + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer + ', 风险:' + (record.riskLevel||'-') + ', 时间:' + (record.discoverTime||'-'));
+            deletedRecords.splice(i, 1);
+            successCount++;
+          } catch (rowErr) {
+            failCount++;
+            console.error('恢复第' + (idx+1) + '条失败:', rowErr);
           }
-          addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 工序:' + (record.process||'-') + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer + ', 风险:' + (record.riskLevel||'-') + ', 时间:' + (record.discoverTime||'-'));
-          deletedRecords.splice(i, 1);
-          successCount++;
         }
       }
+      
+      if (loadingEl) loadingEl.classList.add('hidden');
+      
       document.querySelectorAll('.deleted-checkbox').forEach(cb => cb.checked = false);
       document.getElementById('selectAllDeletedCheckbox').checked = false;
       document.getElementById('deletedBatchActions').style.display = 'none';
       await loadData(true);
       populateMonthFilters();
       renderDeletedRecords();
-      toast('已恢复 ' + successCount + ' 条记录');
+      
+      if (failCount > 0) {
+        toast(`恢复完成：成功 ${successCount} 条，失败 ${failCount} 条`, 'error');
+      } else {
+        toast('已恢复 ' + successCount + ' 条记录', 'success');
+      }
     } catch (err) {
+      const loadingEl = document.getElementById('loadingOverlay');
+      if (loadingEl) loadingEl.classList.add('hidden');
       toast('恢复失败：' + err.message, 'error');
     }
   });
@@ -2393,7 +2419,7 @@ async function submitBatch() {
     
     try {
       const record = {
-        id: Date.now() + i + Math.floor(Math.random()*1000),
+        id: Date.now() + i * 10000 + Math.floor(Math.random()*99999),
         productName: row.productName,
         batchNo: row.batchNo,
         workshop: row.workshop,
