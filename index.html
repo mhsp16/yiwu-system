@@ -470,6 +470,22 @@ async function addLog(action, detail) {
     await sbClient.from('operation_logs').insert([{ action, detail }]);
     operationLogs.unshift({ time: new Date().toLocaleString('zh-CN'), action, detail });
     if (operationLogs.length > MAX_LOGS) operationLogs = operationLogs.slice(0, MAX_LOGS);
+    // 同步清理数据库中超出上限的旧日志
+    try {
+      const { data: allLogs } = await sbClient.from('operation_logs').select('id').order('created_at', { ascending: false }).limit(MAX_LOGS + 20);
+      if (allLogs && allLogs.length >= MAX_LOGS) {
+        const keepIds = allLogs.slice(0, MAX_LOGS).map(l => l.id);
+        const { data: excessLogs } = await sbClient.from('operation_logs').select('id').order('created_at', { ascending: false });
+        if (excessLogs && excessLogs.length > MAX_LOGS) {
+          const deleteIds = excessLogs.slice(MAX_LOGS).map(l => l.id);
+          if (deleteIds.length > 0) {
+            await sbClient.from('operation_logs').delete().in('id', deleteIds);
+          }
+        }
+      }
+    } catch(cleanupErr) {
+      console.error('清理旧日志失败:', cleanupErr);
+    }
   } catch(e) {
     console.error('添加操作日志失败:', e);
   }
