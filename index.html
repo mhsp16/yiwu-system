@@ -414,6 +414,17 @@ tr.today-row td:first-child{font-weight:600}
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <script>
+// ============ XSS PROTECTION ============
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // ============ SUPABASE CONFIG ============
 const SUPABASE_URL = 'https://dmiaekaqiofyetjqbnlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtaWFla2FxaW9meWV0anFibmx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMDIyMTUsImV4cCI6MjA5ODU3ODIxNX0.skkDWY2y9y9b7RTby2sk9Adzh9P_pFyO3mgE__OrZh0';
@@ -809,10 +820,10 @@ function renderDeletedRecords() {
     const remaining = getRemainingDays(r);
     const delTime = new Date(r.deletedAt).toLocaleString('zh-CN');
     html += '<tr><td style="width:36px"><input type="checkbox" class="deleted-checkbox" data-index="' + i + '" onchange="updateDeletedBatchActions()" style="cursor:pointer"></td>' +
-      '<td>' + (i+1) + '</td><td>' + (r.productName||'-') + '</td><td>' + (r.batchNo||'-') + '</td><td>' + (r.workshop||'-') + '</td><td>' + (r.discoverTime||'-') + '</td>' +
-      '<td><span class="badge badge-type">' + (r.foreignType||'-') + '</span></td><td>' + (r.discoverer||'-') + '</td>' +
-      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
-      '<td style="font-size:12px;color:var(--text2)">' + delTime + '</td>' +
+      '<td>' + (i+1) + '</td><td>' + esc(r.productName||'-') + '</td><td>' + esc(r.batchNo||'-') + '</td><td>' + esc(r.workshop||'-') + '</td><td>' + esc(r.discoverTime||'-') + '</td>' +
+      '<td><span class="badge badge-type">' + esc(r.foreignType||'-') + '</span></td><td>' + esc(r.discoverer||'-') + '</td>' +
+      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span>' : '-') + '</td>' +
+      '<td style="font-size:12px;color:var(--text2)">' + esc(delTime) + '</td>' +
       '<td>' + (expired ? '<span class="deleted-badge expired">已过期</span>' : '<span class="deleted-badge valid">剩余' + remaining + '天</span>') + '</td>' +
       '<td><button class="btn btn-sm btn-success" onclick="restoreRecord(' + i + ')">恢复</button>' +
       (expired ? ' <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteRecord(' + i + ')">永久删除</button>' : '') + '</td></tr>';
@@ -888,9 +899,9 @@ function renderOpLog() {
     else if (action.includes('导入')) actionClass += ' log-import';
     html += '<tr>' +
       '<td style="text-align:center;font-weight:600;color:var(--text2)">' + (i + 1) + '</td>' +
-      '<td style="white-space:nowrap;font-size:12px;color:var(--text2)">' + time + '</td>' +
-      '<td><span class="' + actionClass + '">' + icon + ' ' + action + '</span></td>' +
-      '<td style="white-space:normal;word-wrap:break-word;overflow-wrap:break-word;font-size:13px;line-height:1.6;color:var(--text);padding:8px 12px;min-width:200px">' + detail + '</td></tr>';
+      '<td style="white-space:nowrap;font-size:12px;color:var(--text2)">' + esc(time) + '</td>' +
+      '<td><span class="' + actionClass + '">' + icon + ' ' + esc(action) + '</span></td>' +
+      '<td style="white-space:normal;word-wrap:break-word;overflow-wrap:break-word;font-size:13px;line-height:1.6;color:var(--text);padding:8px 12px;min-width:200px">' + esc(detail) + '</td></tr>';
   });
   if (operationLogs.length === 0) html = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text2)">暂无操作日志</td></tr>';
   document.querySelector('#oplogTable tbody').innerHTML = html;
@@ -1145,7 +1156,7 @@ function renderTypeStats(filtered) {
     const pct = total ? (count / total * 100).toFixed(1) : 0;
     html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:12px">' +
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div style="width:24px;height:24px;border-radius:50%;background:' + color + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">' + (i+1) + '</div>' +
-      '<div style="font-size:12px;font-weight:600;color:' + color + '">' + type + '</div></div>' +
+      '<div style="font-size:12px;font-weight:600;color:' + color + '">' + esc(type) + '</div></div>' +
       '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px"><span style="font-size:24px;font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:11px;color:var(--text2)">件</span></div>' +
       '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px"></div></div>' +
       '<span style="font-size:13px;font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
@@ -1165,7 +1176,7 @@ function renderWorkshopStats(filtered) {
     const color = getWorkshopColor(ws);
     const pct = total ? (count / total * 100).toFixed(1) : 0;
     html += '<div style="background:linear-gradient(135deg,' + color + '08,' + color + '15);border:1px solid ' + color + '30;border-radius:8px;padding:10px">' +
-      '<div style="font-size:12px;font-weight:600;color:' + color + ';margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + ws + '">' + ws + '</div>' +
+      '<div style="font-size:12px;font-weight:600;color:' + color + ';margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(ws) + '">' + esc(ws) + '</div>' +
       '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px"><span style="font-size:20px;font-weight:700;color:' + color + ';line-height:1">' + count + '</span><span style="font-size:11px;color:var(--text2)">件</span></div>' +
       '<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:#e2e8f0;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px"></div></div>' +
       '<span style="font-size:12px;font-weight:700;color:' + color + '">' + pct + '%</span></div></div>';
@@ -1232,10 +1243,10 @@ function renderRecentTable(filtered) {
   let html = '';
   recent.forEach((r, i) => {
     const isToday = r.discoverTime === getTodayStr();
-    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + (i+1) + '</td><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
-      '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
-      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
-      '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
+    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + (i+1) + '</td><td>' + esc(r.productName) + '</td><td>' + esc(r.workshop) + '</td><td>' + esc(r.process || '-') + '</td><td>' + esc(r.discoverTime) + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
+      '<td><span class="badge badge-type">' + esc(r.foreignType) + '</span></td><td>' + esc(r.discoverer) + '</td>' +
+      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span>' : '-') + '</td>' +
+      '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + esc(r.handleResult) + '</span></td></tr>';
   });
   document.querySelector('#recentTable tbody').innerHTML = html;
 }
@@ -1293,25 +1304,25 @@ function initEntryForm() {
   
   // Populate selects
   const workshopSelect = form.querySelector('[name="workshop"]');
-  workshopSelect.innerHTML = '<option value="">请选择</option>' + config.workshops.map(w => '<option value="' + w + '">' + w + '</option>').join('');
+  workshopSelect.innerHTML = '<option value="">请选择</option>' + config.workshops.map(w => '<option value="' + esc(w) + '">' + esc(w) + '</option>').join('');
   
   const typeSelect = form.querySelector('[name="foreignType"]');
-  typeSelect.innerHTML = '<option value="">请选择</option>' + config.foreignTypes.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+  typeSelect.innerHTML = '<option value="">请选择</option>' + config.foreignTypes.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
   
   const discovererSelect = form.querySelector('[name="discoverer"]');
-  discovererSelect.innerHTML = '<option value="">请选择</option>' + config.discoverers.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+  discovererSelect.innerHTML = '<option value="">请选择</option>' + config.discoverers.map(d => '<option value="' + esc(d) + '">' + esc(d) + '</option>').join('');
   
   // Populate selects
   const productNameSelect = document.querySelector('select[name="productName"]');
   if (productNameSelect) {
     const currentVal = productNameSelect.value;
-    productNameSelect.innerHTML = '<option value="">请选择</option>' + config.products.map(p => '<option value="' + p + '">' + p + '</option>').join('');
+    productNameSelect.innerHTML = '<option value="">请选择</option>' + config.products.map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('');
     if (currentVal) productNameSelect.value = currentVal;
   }
   const processSelect = document.querySelector('select[name="process"]');
   if (processSelect) {
     const currentVal = processSelect.value;
-    processSelect.innerHTML = '<option value="">请选择</option>' + config.processes.map(p => '<option value="' + p + '">' + p + '</option>').join('');
+    processSelect.innerHTML = '<option value="">请选择</option>' + config.processes.map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('');
     if (currentVal) processSelect.value = currentVal;
   }
   
@@ -1400,12 +1411,12 @@ function renderRecords() {
   pageData.forEach((r, i) => {
     const desc = r.description ? (r.description.length > 15 ? r.description.substring(0, 15) + '...' : r.description) : '-';
     const isToday = r.discoverTime === getTodayStr();
-    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + r.productName + '</td><td>' + (r.batchNo || '-') + '</td><td>' + r.workshop + '</td><td>' + (r.process || '-') + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
-      '<td><span class="badge badge-type">' + r.foreignType + '</span></td><td>' + r.discoverer + '</td>' +
-      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span>' : '-') + '</td>' +
-      '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td>' +
-      '<td>' + (r.responsible || '-') + '</td>' +
-      '<td title="' + (r.description || '').replace(/"/g, '&quot;') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + desc + '</td>' +
+    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + esc(r.productName) + '</td><td>' + esc(r.batchNo || '-') + '</td><td>' + esc(r.workshop) + '</td><td>' + esc(r.process || '-') + '</td><td>' + esc(r.discoverTime) + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
+      '<td><span class="badge badge-type">' + esc(r.foreignType) + '</span></td><td>' + esc(r.discoverer) + '</td>' +
+      '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span>' : '-') + '</td>' +
+      '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + esc(r.handleResult) + '</span></td>' +
+      '<td>' + esc(r.responsible || '-') + '</td>' +
+      '<td title="' + esc(r.description || '') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + esc(desc) + '</td>' +
       
       '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(' + r.id + ')">删除</button></td></tr>';
   });
@@ -1427,8 +1438,8 @@ function renderRecords() {
   // Populate filter selects (preserve current selection)
   const curType = document.getElementById('filterType').value;
   const curWs = document.getElementById('filterWorkshop').value;
-  document.getElementById('filterType').innerHTML = '<option value="">全部类型</option>' + config.foreignTypes.map(t => '<option value="' + t + '">' + t + '</option>').join('');
-  document.getElementById('filterWorkshop').innerHTML = '<option value="">全部车间</option>' + config.workshops.map(w => '<option value="' + w + '">' + w + '</option>').join('');
+  document.getElementById('filterType').innerHTML = '<option value="">全部类型</option>' + config.foreignTypes.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
+  document.getElementById('filterWorkshop').innerHTML = '<option value="">全部车间</option>' + config.workshops.map(w => '<option value="' + esc(w) + '">' + esc(w) + '</option>').join('');
   document.getElementById('filterType').value = curType;
   document.getElementById('filterWorkshop').value = curWs;
 }
@@ -1443,21 +1454,21 @@ function viewRecord(id) {
   if (!r) return;
   
   let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
-  html += '<div><strong>产品名称：</strong>' + r.productName + '</div>';
-  html += '<div><strong>批号：</strong>' + (r.batchNo || '-') + '</div>';
-  html += '<div><strong>车间：</strong>' + r.workshop + '</div>';
-  html += '<div><strong>工序：</strong>' + (r.process || '-') + '</div>';
-  html += '<div><strong>发现时间：</strong>' + r.discoverTime + '</div>';
-  html += '<div><strong>异物类型：</strong>' + r.foreignType + '</div>';
-  html += '<div><strong>发现人：</strong>' + r.discoverer + '</div>';
-  html += '<div><strong>风险等级：</strong>' + (r.riskLevel || '-') + '</div>';
-  html += '<div style="grid-column:1/-1"><strong>处理状态：</strong>' + r.handleResult + '</div>';
-  html += '<div style="grid-column:1/-1"><strong>责任人：</strong>' + (r.responsible || '-') + '</div>';
-  if (r.description) html += '<div style="grid-column:1/-1"><strong>描述：</strong>' + r.description + '</div>';
-  if (r.sourceAnalysis) html += '<div style="grid-column:1/-1"><strong>来源分析：</strong>' + r.sourceAnalysis + '</div>';
-  if (r.handleMeasure) html += '<div style="grid-column:1/-1"><strong>处理措施：</strong>' + r.handleMeasure + '</div>';
-  if (r.rectification) html += '<div style="grid-column:1/-1"><strong>整改情况：</strong>' + r.rectification + '</div>';
-  if (r.remark) html += '<div style="grid-column:1/-1"><strong>备注：</strong>' + r.remark + '</div>';
+  html += '<div><strong>产品名称：</strong>' + esc(r.productName) + '</div>';
+  html += '<div><strong>批号：</strong>' + esc(r.batchNo || '-') + '</div>';
+  html += '<div><strong>车间：</strong>' + esc(r.workshop) + '</div>';
+  html += '<div><strong>工序：</strong>' + esc(r.process || '-') + '</div>';
+  html += '<div><strong>发现时间：</strong>' + esc(r.discoverTime) + '</div>';
+  html += '<div><strong>异物类型：</strong>' + esc(r.foreignType) + '</div>';
+  html += '<div><strong>发现人：</strong>' + esc(r.discoverer) + '</div>';
+  html += '<div><strong>风险等级：</strong>' + esc(r.riskLevel || '-') + '</div>';
+  html += '<div style="grid-column:1/-1"><strong>处理状态：</strong>' + esc(r.handleResult) + '</div>';
+  html += '<div style="grid-column:1/-1"><strong>责任人：</strong>' + esc(r.responsible || '-') + '</div>';
+  if (r.description) html += '<div style="grid-column:1/-1"><strong>描述：</strong>' + esc(r.description) + '</div>';
+  if (r.sourceAnalysis) html += '<div style="grid-column:1/-1"><strong>来源分析：</strong>' + esc(r.sourceAnalysis) + '</div>';
+  if (r.handleMeasure) html += '<div style="grid-column:1/-1"><strong>处理措施：</strong>' + esc(r.handleMeasure) + '</div>';
+  if (r.rectification) html += '<div style="grid-column:1/-1"><strong>整改情况：</strong>' + esc(r.rectification) + '</div>';
+  if (r.remark) html += '<div style="grid-column:1/-1"><strong>备注：</strong>' + esc(r.remark) + '</div>';
   html += '</div>';
   
   document.getElementById('detailBody').innerHTML = html;
@@ -1540,10 +1551,10 @@ function renderAnalysis(type) {
     // Type × Month table
     const months = [...new Set(filtered.map(r => r.discoverTime.substring(0, 7)))].sort();
     let tableHtml = '<thead><tr><th>异物类型</th>';
-    months.forEach(m => tableHtml += '<th>' + m + '</th>');
+    months.forEach(m => tableHtml += '<th>' + esc(m) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([type, total]) => {
-      tableHtml += '<tr><td>' + type + '</td>';
+      tableHtml += '<tr><td>' + esc(type) + '</td>';
       months.forEach(m => {
         const count = filtered.filter(r => r.foreignType === type && r.discoverTime.startsWith(m)).length;
         tableHtml += '<td>' + count + '</td>';
@@ -1569,10 +1580,10 @@ function renderAnalysis(type) {
     // Workshop × Type table
     const types = [...new Set(filtered.map(r => r.foreignType))].sort();
     let tableHtml = '<thead><tr><th>车间</th>';
-    types.forEach(t => tableHtml += '<th>' + t + '</th>');
+    types.forEach(t => tableHtml += '<th>' + esc(t) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([ws, total]) => {
-      tableHtml += '<tr><td>' + ws + '</td>';
+      tableHtml += '<tr><td>' + esc(ws) + '</td>';
       types.forEach(t => {
         const count = filtered.filter(r => r.workshop === ws && r.foreignType === t).length;
         tableHtml += '<td>' + count + '</td>';
@@ -1615,7 +1626,7 @@ function renderAnalysis(type) {
     let tableHtml = '<thead><tr><th>月份</th><th>数量</th><th>占比</th></tr></thead><tbody>';
     months.forEach(m => {
       const pct = filtered.length ? (monthCount[m] / filtered.length * 100).toFixed(1) : 0;
-      tableHtml += '<tr><td>' + m + '</td><td>' + monthCount[m] + '</td><td>' + pct + '%</td></tr>';
+      tableHtml += '<tr><td>' + esc(m) + '</td><td>' + monthCount[m] + '</td><td>' + pct + '%</td></tr>';
     });
     tableHtml += '</tbody>';
     document.getElementById('timeMonthTable').innerHTML = tableHtml;
@@ -1638,10 +1649,10 @@ function renderAnalysis(type) {
     // Product × Type table
     const types = [...new Set(filtered.map(r => r.foreignType))].sort();
     let tableHtml = '<thead><tr><th>产品</th>';
-    types.forEach(t => tableHtml += '<th>' + t + '</th>');
+    types.forEach(t => tableHtml += '<th>' + esc(t) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([prod, total]) => {
-      tableHtml += '<tr><td>' + prod + '</td>';
+      tableHtml += '<tr><td>' + esc(prod) + '</td>';
       types.forEach(t => {
         const count = filtered.filter(r => r.productName === prod && r.foreignType === t).length;
         tableHtml += '<td>' + count + '</td>';
@@ -1667,10 +1678,10 @@ function renderAnalysis(type) {
     // Person × Month table
     const months = [...new Set(filtered.map(r => r.discoverTime.substring(0, 7)))].sort();
     let tableHtml = '<thead><tr><th>发现人</th>';
-    months.forEach(m => { tableHtml += '<th>' + m + '</th>'; });
+    months.forEach(m => { tableHtml += '<th>' + esc(m) + '</th>'; });
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([person, total]) => {
-      tableHtml += '<tr><td>' + person + '</td>';
+      tableHtml += '<tr><td>' + esc(person) + '</td>';
       months.forEach(m => {
         const count = filtered.filter(r => r.discoverer === person && r.discoverTime.startsWith(m)).length;
         tableHtml += '<td>' + count + '</td>';
@@ -1724,7 +1735,7 @@ function renderAnalysis(type) {
     let tableHtml = '<thead><tr><th>产品</th><th>车间</th><th>发现时间</th><th>异物类型</th><th>风险等级</th><th>状态</th></tr></thead><tbody>';
     highRisk.forEach(r => {
       const isToday = r.discoverTime === getTodayStr();
-      tableHtml += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + r.productName + '</td><td>' + r.workshop + '</td><td>' + r.discoverTime + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + r.foreignType + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + r.riskLevel + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + r.handleResult + '</span></td></tr>';
+      tableHtml += '<tr class="' + (isToday ? 'today-row' : '') + '"><td>' + esc(r.productName) + '</td><td>' + esc(r.workshop) + '</td><td>' + esc(r.discoverTime) + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td><td>' + esc(r.foreignType) + '</td><td><span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span></td><td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + esc(r.handleResult) + '</span></td></tr>';
     });
     tableHtml += '</tbody>';
     document.getElementById('riskDetailTable').innerHTML = tableHtml;
@@ -1737,11 +1748,11 @@ function filterByMonth(data, month) {
 
 // ============ CONFIG ============
 function renderConfig() {
-  document.getElementById('foreignTypeList').innerHTML = config.foreignTypes.map(t => '<div class="config-tag">' + t + ' <span class="remove" onclick="removeConfig(\'foreignTypes\',\'' + t + '\')">×</span></div>').join('');
-  document.getElementById('workshopList').innerHTML = config.workshops.map(w => '<div class="config-tag">' + w + ' <span class="remove" onclick="removeConfig(\'workshops\',\'' + w + '\')">×</span></div>').join('');
-  document.getElementById('discovererList').innerHTML = config.discoverers.map(d => '<div class="config-tag">' + d + ' <span class="remove" onclick="removeConfig(\'discoverers\',\'' + d + '\')">×</span></div>').join('');
-  document.getElementById('productList2').innerHTML = config.products.map(p => '<div class="config-tag">' + p + ' <span class="remove" onclick="removeConfig(\'products\',\'' + p + '\')">×</span></div>').join('');
-  document.getElementById('processList2').innerHTML = config.processes.map(p => '<div class="config-tag">' + p + ' <span class="remove" onclick="removeConfig(\'processes\',\'' + p + '\')">×</span></div>').join('');
+  document.getElementById('foreignTypeList').innerHTML = config.foreignTypes.map(t => '<div class="config-tag">' + esc(t) + ' <span class="remove" onclick="removeConfig(\'foreignTypes\',' + JSON.stringify(t) + ')">×</span></div>').join('');
+  document.getElementById('workshopList').innerHTML = config.workshops.map(w => '<div class="config-tag">' + esc(w) + ' <span class="remove" onclick="removeConfig(\'workshops\',' + JSON.stringify(w) + ')">×</span></div>').join('');
+  document.getElementById('discovererList').innerHTML = config.discoverers.map(d => '<div class="config-tag">' + esc(d) + ' <span class="remove" onclick="removeConfig(\'discoverers\',' + JSON.stringify(d) + ')">×</span></div>').join('');
+  document.getElementById('productList2').innerHTML = config.products.map(p => '<div class="config-tag">' + esc(p) + ' <span class="remove" onclick="removeConfig(\'products\',' + JSON.stringify(p) + ')">×</span></div>').join('');
+  document.getElementById('processList2').innerHTML = config.processes.map(p => '<div class="config-tag">' + esc(p) + ' <span class="remove" onclick="removeConfig(\'processes\',' + JSON.stringify(p) + ')">×</span></div>').join('');
 }
 
 async function addForeignType() {
@@ -2156,11 +2167,11 @@ function renderWeeklyStats(filtered) {
   // Week detail table
   const allTypes = [...new Set(filtered.map(r => r.foreignType).filter(Boolean))];
   let tableHtml = '<thead><tr><th style="text-align:left">周期</th><th style="text-align:center">总数</th>';
-  allTypes.forEach(t => { tableHtml += '<th style="text-align:center">' + t + '</th>'; });
+  allTypes.forEach(t => { tableHtml += '<th style="text-align:center">' + esc(t) + '</th>'; });
   tableHtml += '</tr></thead><tbody>';
   weeks.forEach(wk => {
     const w = weekMap[wk];
-    tableHtml += '<tr><td style="font-weight:500;text-align:left;white-space:nowrap">' + w.label + '</td><td style="text-align:center"><strong style="color:var(--primary);font-size:14px">' + w.count + '</strong></td>';
+    tableHtml += '<tr><td style="font-weight:500;text-align:left;white-space:nowrap">' + esc(w.label) + '</td><td style="text-align:center"><strong style="color:var(--primary);font-size:14px">' + w.count + '</strong></td>';
     allTypes.forEach(t => {
       const cnt = w.types[t] || 0;
       tableHtml += '<td style="text-align:center">' + (cnt > 0 ? '<span class="badge badge-type">' + cnt + '</span>' : '-') + '</td>';
@@ -2237,14 +2248,14 @@ function renderPersonRanking(data) {
       mr.filter(function(r) { return r.discoverer === person; }).forEach(function(r) {
         if (r.foreignType) typeDetail[r.foreignType] = (typeDetail[r.foreignType] || 0) + 1;
       });
-      var typeStr = Object.keys(typeDetail).map(function(t) { return t + '(' + typeDetail[t] + ')'; }).join('、');
+      var typeStr = Object.keys(typeDetail).map(function(t) { return esc(t) + '(' + typeDetail[t] + ')'; }).join('、');
       
       var medal = idx === 0 ? '' : idx === 1 ? '' : idx === 2 ? '' : '';
       var rowStyle = idx === 0 ? 'background: #fef9c3' : idx === 1 ? 'background: #f0f4f8' : idx === 2 ? 'background: #ffedd5' : '';
       
       html += '<tr style="' + rowStyle + '">';
       html += '<td style="text-align: center; font-weight: 600">' + (medal || (idx + 1)) + '</td>';
-      html += '<td style="font-weight: 500">' + person + '</td>';
+      html += '<td style="font-weight: 500">' + esc(person) + '</td>';
       html += '<td style="text-align: center"><strong style="font-size: 15px; color: var(--primary)">' + cnt + '</strong></td>';
       html += '<td><div style="display: flex; align-items: center; gap: 6px">';
       html += '<div style="flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden">';
@@ -2344,20 +2355,20 @@ function renderBatchTable() {
       '<td>' + (status === 'success' ? statusIcon : statusIcon + ' <button class="btn btn-sm btn-danger" onclick="removeBatchRow('+idx+')" style="padding:2px 6px;font-size:11px">✕</button>') + '</td>' +
       '<td>' + (idx+1) + '</td>' +
       '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'productName\',this.value)"><option value="">请选择</option>' + productOpts + '</select></td>' +
-      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.batchNo||'')+'" onchange="updateBatchRow('+idx+',\'batchNo\',this.value)" placeholder="批号"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+esc(row.batchNo||'')+'" onchange="updateBatchRow('+idx+',\'batchNo\',this.value)" placeholder="批号"></td>' +
       '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'workshop\',this.value)"><option value="">请选择</option>' + workshopOpts + '</select></td>' +
       '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'process\',this.value)"><option value="">请选择</option>' + processOpts + '</select></td>' +
-      '<td><input class="form-input" type="date" style="min-width:120px;padding:4px 8px;font-size:12px" value="'+(row.discoverTime||'')+'" onchange="updateBatchRow('+idx+',\'discoverTime\',this.value)"></td>' +
+      '<td><input class="form-input" type="date" style="min-width:120px;padding:4px 8px;font-size:12px" value="'+esc(row.discoverTime||'')+'" onchange="updateBatchRow('+idx+',\'discoverTime\',this.value)"></td>' +
       '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'foreignType\',this.value)"><option value="">请选择</option>' + typeOpts + '</select></td>' +
       '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'discoverer\',this.value)"><option value="">请选择</option>' + discovererOpts + '</select></td>' +
       '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'riskLevel\',this.value)">' + riskOpts + '</select></td>' +
-      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.description||'')+'" onchange="updateBatchRow('+idx+',\'description\',this.value)" placeholder="描述"></td>' +
-      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.sourceAnalysis||'')+'" onchange="updateBatchRow('+idx+',\'sourceAnalysis\',this.value)" placeholder="来源"></td>' +
-      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.handleMeasure||'')+'" onchange="updateBatchRow('+idx+',\'handleMeasure\',this.value)" placeholder="措施"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+esc(row.description||'')+'" onchange="updateBatchRow('+idx+',\'description\',this.value)" placeholder="描述"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+esc(row.sourceAnalysis||'')+'" onchange="updateBatchRow('+idx+',\'sourceAnalysis\',this.value)" placeholder="来源"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+esc(row.handleMeasure||'')+'" onchange="updateBatchRow('+idx+',\'handleMeasure\',this.value)" placeholder="措施"></td>' +
       '<td><select class="form-select" style="min-width:80px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'handleResult\',this.value)">' + resultOpts + '</select></td>' +
-      '<td><input class="form-input" style="min-width:70px;padding:4px 8px;font-size:12px" value="'+(row.responsible||'')+'" onchange="updateBatchRow('+idx+',\'responsible\',this.value)" placeholder="责任人"></td>' +
-      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+(row.rectification||'')+'" onchange="updateBatchRow('+idx+',\'rectification\',this.value)" placeholder="整改"></td>' +
-      '<td><input class="form-input" style="min-width:80px;padding:4px 8px;font-size:12px" value="'+(row.remark||'')+'" onchange="updateBatchRow('+idx+',\'remark\',this.value)" placeholder="备注"></td>' +
+      '<td><input class="form-input" style="min-width:70px;padding:4px 8px;font-size:12px" value="'+esc(row.responsible||'')+'" onchange="updateBatchRow('+idx+',\'responsible\',this.value)" placeholder="责任人"></td>' +
+      '<td><input class="form-input" style="min-width:100px;padding:4px 8px;font-size:12px" value="'+esc(row.rectification||'')+'" onchange="updateBatchRow('+idx+',\'rectification\',this.value)" placeholder="整改"></td>' +
+      '<td><input class="form-input" style="min-width:80px;padding:4px 8px;font-size:12px" value="'+esc(row.remark||'')+'" onchange="updateBatchRow('+idx+',\'remark\',this.value)" placeholder="备注"></td>' +
       '</tr>';
     if (status === 'failed' && row._error) {
       html += '<tr style="background:#fef2f2"><td colspan="17" style="padding:4px 12px;font-size:11px;color:#dc2626;border-bottom:2px solid #fecaca">❌ 提交失败：' + row._error.replace(/</g, '&lt;') + '</td></tr>';
@@ -2519,7 +2530,7 @@ function showBatchResultModal(successItems, failedItems) {
     html += '<div style="margin-bottom:16px"><h4 style="color:#166534;font-size:14px;margin-bottom:8px">✅ 成功提交 (' + successItems.length + '条)</h4>';
     html += '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#f0fdf4"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">#</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">产品</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">车间</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">类型</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #bbf7d0">发现人</th></tr></thead><tbody>';
     successItems.forEach(function(item) {
-      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + item.product + '</td><td style="padding:4px 8px">' + item.workshop + '</td><td style="padding:4px 8px">' + item.type + '</td><td style="padding:4px 8px">' + item.discoverer + '</td></tr>';
+      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + esc(item.product) + '</td><td style="padding:4px 8px">' + esc(item.workshop) + '</td><td style="padding:4px 8px">' + esc(item.type) + '</td><td style="padding:4px 8px">' + esc(item.discoverer) + '</td></tr>';
     });
     html += '</tbody></table></div>';
   }
@@ -2529,7 +2540,7 @@ function showBatchResultModal(successItems, failedItems) {
     html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;color:#991b1b">💡 失败记录已保留在批量录入表格中（标红显示），可修正后重新提交</div>';
     html += '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="background:#fef2f2"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">#</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">产品</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">车间</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">类型</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">发现人</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fecaca">错误原因</th></tr></thead><tbody>';
     failedItems.forEach(function(item) {
-      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + item.product + '</td><td style="padding:4px 8px">' + item.workshop + '</td><td style="padding:4px 8px">' + item.type + '</td><td style="padding:4px 8px">' + item.discoverer + '</td><td style="padding:4px 8px;color:#dc2626">' + item.error + '</td></tr>';
+      html += '<tr><td style="padding:4px 8px">' + item.rowNum + '</td><td style="padding:4px 8px">' + esc(item.product) + '</td><td style="padding:4px 8px">' + esc(item.workshop) + '</td><td style="padding:4px 8px">' + esc(item.type) + '</td><td style="padding:4px 8px">' + esc(item.discoverer) + '</td><td style="padding:4px 8px;color:#dc2626">' + esc(item.error) + '</td></tr>';
     });
     html += '</tbody></table></div>';
   }
@@ -2575,7 +2586,7 @@ function populateMonthFilters() {
   prefixes.forEach(prefix => {
     const yearSel = document.getElementById('filterYear' + prefix);
     if (!yearSel) return;
-    yearSel.innerHTML = allYears.map(y => '<option value="' + y + '">' + y + '年</option>').join('');
+    yearSel.innerHTML = allYears.map(y => '<option value="' + esc(y) + '">' + esc(y) + '年</option>').join('');
     yearSel.value = filterYear;
     updateMonthOptions(prefix);
   });
@@ -2616,7 +2627,7 @@ function updateMonthOptions(prefix) {
   const curMonth = monthSel.value;
   // 将月份按降序排列（最新的在前面）
   months.sort((a, b) => b.localeCompare(a));
-  monthSel.innerHTML = '<option value="">全部月份</option>' + months.map(m => '<option value="' + m + '">' + parseInt(m) + '月</option>').join('');
+  monthSel.innerHTML = '<option value="">全部月份</option>' + months.map(m => '<option value="' + esc(m) + '">' + esc(parseInt(m)) + '月</option>').join('');
   if (curMonth && months.includes(curMonth)) monthSel.value = curMonth;
 }
 
