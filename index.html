@@ -239,7 +239,7 @@ tr.today-row td:first-child{font-weight:600}
 <div class="card"><div class="card-header"><span class="card-title">📋 异物发现记录</span><div class="btn-group"><button class="btn btn-outline btn-sm" onclick="exportCSV()">📤 导出CSV</button><button class="btn btn-primary btn-sm" onclick="showPage('entry')">＋ 新增</button></div></div>
 <div style="background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
-<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:12px;font-weight:600;color:var(--text2)">🔍 关键词搜索</label><input class="form-input" id="filterKeyword" placeholder="输入产品名称、发现人、描述等..." oninput="renderRecords()" style="padding:8px 12px;font-size:14px;width:100%"></div>
+<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:12px;font-weight:600;color:var(--text2)">🔍 关键词搜索</label><input class="form-input" id="filterKeyword" placeholder="输入产品名称、发现人、描述等..." oninput="onKeywordInput()" style="padding:8px 12px;font-size:14px;width:100%"></div>
 <div style="display:flex;gap:8px;align-items:end"><div style="display:flex;flex-direction:column;gap:4px;flex:1"><label style="font-size:12px;font-weight:600;color:var(--text2)">📅 开始日期</label><input class="form-input" id="filterDateFrom" type="date" onchange="renderRecords()" style="padding:8px 10px;font-size:13px;width:100%"></div><span style="padding-bottom:8px;color:var(--text2)">至</span><div style="display:flex;flex-direction:column;gap:4px;flex:1"><label style="font-size:12px;font-weight:600;color:var(--text2)">📅 结束日期</label><input class="form-input" id="filterDateTo" type="date" onchange="renderRecords()" style="padding:8px 10px;font-size:13px;width:100%"></div></div>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px">
@@ -266,7 +266,7 @@ tr.today-row td:first-child{font-weight:600}
 
 <!-- Operation Log -->
 <div class="page" id="page-oplog">
-<div class="card"><div class="card-header"><span class="card-title"> 操作日志</span><span class="card-subtitle">记录最近50次操作，超出自动删除</span></div>
+<div class="card"><div class="card-header"><span class="card-title">🕒 操作日志</span><span class="card-subtitle">记录最近50次操作，超出自动删除</span></div>
 <div class="table-wrapper"><table id="oplogTable"><thead><tr><th>序号</th><th>操作时间</th><th>操作类型</th><th>操作详情</th></tr></thead><tbody></tbody></table></div>
 <div style="text-align:right;margin-top:8px;font-size:11px;color:var(--text2)" id="oplogCount"></div>
 </div></div>
@@ -275,12 +275,12 @@ tr.today-row td:first-child{font-weight:600}
 <div class="page" id="page-batch-entry">
 <div class="card">
 <div class="card-header">
-<span class="card-title"> 批量录入</span>
+<span class="card-title">📝 批量录入</span>
 <span class="card-subtitle">添加多条记录后一次性提交</span>
 </div>
 <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 <button class="btn btn-primary" onclick="addBatchRow()">＋ 添加一行</button>
-<button class="btn btn-success" onclick="submitBatch()"> 批量提交</button>
+<button class="btn btn-success" onclick="submitBatch()">✅ 批量提交</button>
 <button class="btn btn-warning" id="clearFailedBtn" onclick="clearFailedRows()" style="display:none">🗑️ 清除失败记录</button>
 <button class="btn btn-outline" onclick="clearBatch()">🗑️ 清空列表</button>
 <span id="batchCount" style="font-size:13px;color:var(--text2);margin-left:8px">共 0 条待提交</span>
@@ -428,9 +428,58 @@ function esc(str) {
 // ============ SUPABASE CONFIG ============
 const SUPABASE_URL = 'https://dmiaekaqiofyetjqbnlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtaWFla2FxaW9meWV0anFibmx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMDIyMTUsImV4cCI6MjA5ODU3ODIxNX0.skkDWY2y9y9b7RTby2sk9Adzh9P_pFyO3mgE__OrZh0';
-const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(8000) }) }
-});
+let sbClient = null;
+try {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+    throw new Error('supabase.js 加载失败或被拦截');
+  }
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    global: { fetch: (url, opts) => {
+      const o = { ...opts };
+      if (window.AbortSignal && typeof AbortSignal.timeout === 'function') o.signal = AbortSignal.timeout(8000);
+      return fetch(url, o);
+    } }
+  });
+} catch (e) {
+  console.error('初始化 Supabase 客户端失败:', e);
+  (function showFatal() {
+    const ov = document.getElementById('loadingOverlay');
+    if (!ov) return;
+    ov.classList.remove('hidden');
+    const sp = ov.querySelector('.loading-spinner'); if (sp) sp.style.display = 'none';
+    const tx = ov.querySelector('.loading-text');
+    if (tx) { tx.textContent = '系统初始化失败：' + (e && e.message ? e.message : e); tx.style.color = '#dc2626'; }
+    const sub = ov.querySelector('.loading-sub');
+    if (sub) sub.textContent = '请检查 supabase.js / chart.umd.min.js 是否与 index.html 放在同一目录并已正确加载，然后刷新页面';
+  })();
+}
+
+// ===== 服务器时间校正（用 HTTP Date 响应头估算客户端与服务端时钟偏差）=====
+let _serverTimeOffset = null;
+async function syncServerTime() {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/', { method: 'GET' });
+    const d = res.headers.get('date');
+    if (d) _serverTimeOffset = new Date(d).getTime() - Date.now();
+  } catch (e) { /* 校正失败则退回本地时钟 */ }
+}
+function serverNow() { return Date.now() + (_serverTimeOffset || 0); }
+
+// ===== 唯一 client_id 生成（时间戳 + 随机数 + 内存去重，避免 upsert 静默覆盖）=====
+function generateClientIds(n) {
+  const used = new Set(records.map(r => Number(r.id)).filter(x => !isNaN(x) && x > 0));
+  const out = [];
+  const base = Date.now() * 1000; // 保持在 Number.MAX_SAFE_INTEGER 内
+  for (let i = 0; i < n; i++) {
+    let id = base + Math.floor(Math.random() * 1000);
+    let guard = 0;
+    while (used.has(id) && guard++ < 100) id = base + Math.floor(Math.random() * 1000);
+    used.add(id);
+    out.push(id);
+  }
+  return out;
+}
+function generateClientId() { return generateClientIds(1)[0]; }
 
 // Get today's date in local timezone (YYYY-MM-DD)
 function getTodayStr() {
@@ -455,9 +504,13 @@ let filterMonth = '';
 // ===== 颜色一致性映射 =====
 const TYPE_PALETTE = ['#2563eb','#16a34a','#f59e0b','#dc2626','#8b5cf6','#0891b2','#ea580c','#65a30d','#d946ef','#0ea5e9'];
 const RISK_COLORS = { '低风险':'#16a34a', '中风险':'#f59e0b', '高风险':'#ea580c', '重大风险':'#dc2626', '未评估':'#94a3b8' };
-const RISK_ICONS = { '低风险':'🟢', '中风险':'🟡', '高风险':'', '重大风险':'🔴', '未评估':'⬜' };
-function getTypeColor(type) { const idx = config.foreignTypes.indexOf(type); return TYPE_PALETTE[idx >= 0 ? idx % TYPE_PALETTE.length : 0]; }
-function getWorkshopColor(ws) { const idx = config.workshops.indexOf(ws); return TYPE_PALETTE[idx >= 0 ? idx % TYPE_PALETTE.length : 0]; }
+function hashColor(str) {
+  let h = 0; const s = String(str == null ? '' : str);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return TYPE_PALETTE[Math.abs(h) % TYPE_PALETTE.length];
+}
+function getTypeColor(type) { const idx = config.foreignTypes.indexOf(type); return idx >= 0 ? TYPE_PALETTE[idx % TYPE_PALETTE.length] : hashColor(type); }
+function getWorkshopColor(ws) { const idx = config.workshops.indexOf(ws); return idx >= 0 ? TYPE_PALETTE[idx % TYPE_PALETTE.length] : hashColor(ws); }
 function getRiskColor(level) { return RISK_COLORS[level] || RISK_COLORS['未评估']; }
 
 // ===== 操作日志 =====
@@ -473,26 +526,16 @@ async function loadOperationLogs() {
     operationLogs = [];
   }
 }
-async function saveOperationLogs() {
-  // 不再需要，每次直接写入数据库
-}
 async function addLog(action, detail) {
   try {
     await sbClient.from('operation_logs').insert([{ action, detail }]);
     operationLogs.unshift({ time: new Date().toLocaleString('zh-CN'), action, detail });
     if (operationLogs.length > MAX_LOGS) operationLogs = operationLogs.slice(0, MAX_LOGS);
-    // 同步清理数据库中超出上限的旧日志
+    // 清理超出上限的日志：一次 range 查询只取超出部分的 id（避免全表拉取）
     try {
-      const { data: allLogs } = await sbClient.from('operation_logs').select('id').order('created_at', { ascending: false }).limit(MAX_LOGS + 20);
-      if (allLogs && allLogs.length >= MAX_LOGS) {
-        const keepIds = allLogs.slice(0, MAX_LOGS).map(l => l.id);
-        const { data: excessLogs } = await sbClient.from('operation_logs').select('id').order('created_at', { ascending: false });
-        if (excessLogs && excessLogs.length > MAX_LOGS) {
-          const deleteIds = excessLogs.slice(MAX_LOGS).map(l => l.id);
-          if (deleteIds.length > 0) {
-            await sbClient.from('operation_logs').delete().in('id', deleteIds);
-          }
-        }
+      const { data: excessLogs } = await sbClient.from('operation_logs').select('id').order('created_at', { ascending: false }).range(MAX_LOGS, MAX_LOGS + 49);
+      if (excessLogs && excessLogs.length > 0) {
+        await sbClient.from('operation_logs').delete().in('id', excessLogs.map(l => l.id));
       }
     } catch(cleanupErr) {
       console.error('清理旧日志失败:', cleanupErr);
@@ -539,11 +582,8 @@ async function loadDeletedRecords() {
     deletedRecords = [];
   }
 }
-async function saveDeletedRecords() {
-  // 不再需要，每次直接写入数据库
-}
 async function cleanExpiredDeleted() {
-  const now = Date.now();
+  const now = serverNow();
   const sevenDays = 7*24*60*60*1000;
   // 只清理真正过期的记录（deletedAt 必须是有效时间戳）
   const expired = deletedRecords.filter(r => {
@@ -566,13 +606,13 @@ async function cleanExpiredDeleted() {
     return (now - r.deletedAt) < sevenDays;
   });
 }
-function getRemainingDays(rec) { const now = Date.now(); const sevenDays = 7*24*60*60*1000; if (!rec.deletedAt || isNaN(rec.deletedAt) || rec.deletedAt <= 0) return 7; return Math.max(0, Math.ceil((sevenDays - (now - rec.deletedAt)) / (24*60*60*1000))); }
+function getRemainingDays(rec) { const now = serverNow(); const sevenDays = 7*24*60*60*1000; if (!rec.deletedAt || isNaN(rec.deletedAt) || rec.deletedAt <= 0) return 7; return Math.max(0, Math.ceil((sevenDays - (now - rec.deletedAt)) / (24*60*60*1000))); }
 function isExpired(rec) { return getRemainingDays(rec) <= 0; }
 
 async function moveToDeleted(id) {
-  const r = records.find(rec => rec.id === id || rec.client_id === id);
-  if (!r) { toast('记录不存在', 'error'); return; }
-  const deletedRecord = { ...r, deletedAt: Date.now() };
+  const r = records.find(rec => String(rec.id) === String(id) || String(rec.client_id) === String(id));
+  if (!r) { toast('记录不存在或已被其他用户修改，请刷新后重试', 'error'); return false; }
+  const deletedRecord = { ...r, deletedAt: serverNow() };
   const logDetail = '产品:' + (r.productName||'-') + ', 批号:' + (r.batchNo||'-') + ', 车间:' + (r.workshop||'-') + ', 工序:' + (r.process||'-') + ', 类型:' + (r.foreignType||'-') + ', 发现人:' + (r.discoverer||'-') + ', 风险:' + (r.riskLevel||'-') + ', 时间:' + (r.discoverTime||'-');
   try {
     // 1. 先插入到 deleted_records 表，并获取返回数据以确认写入成功
@@ -601,16 +641,23 @@ async function moveToDeleted(id) {
     if (insertError) {
       console.error('插入deleted_records失败:', insertError);
       toast('删除失败: ' + insertError.message, 'error');
-      return;
+      return false;
     }
     if (!insertedData || insertedData.length === 0) {
       console.error('插入deleted_records返回空，可能被RLS策略拦截');
       toast('删除失败: 记录未能保存到最近删除表，请检查数据库RLS策略', 'error');
-      return;
+      return false;
     }
 
-    // 3. 插入成功后，才从主表删除原记录
-    await deleteRecordFromDB(r.client_id || id);
+    // 3. 插入成功后，才从主表删除原记录；删除失败则回滚 deleted_records，避免双份数据
+    try {
+      await deleteRecordFromDB(r.client_id || id, r.id);
+    } catch (delErr) {
+      console.error('主表删除失败，回滚 deleted_records:', delErr);
+      try { await sbClient.from('deleted_records').delete().eq('id', insertedData[0].id); } catch (rbErr) { console.error('回滚失败:', rbErr); }
+      toast('删除失败: ' + (delErr.message || '未知错误'), 'error');
+      return false;
+    }
 
     // 4. 更新内存数组（用数据库返回的真实id）
     const dbRecord = insertedData[0];
@@ -619,18 +666,25 @@ async function moveToDeleted(id) {
 
     // 5. 记录日志
     addLog('删除记录', logDetail);
-    toast('记录已删除');
+    return true;
   } catch(e) {
     console.error('移动到最近删除失败:', e);
     toast('删除失败: ' + (e.message || '未知错误'), 'error');
+    return false;
   }
 }
 
-async function restoreRecord(index) {
-  const dr = deletedRecords[index];
-  if (!dr) { toast('记录不存在', 'error'); return; }
+// 按 deleted_records 表的主键 id 查找，避免数组 index 错位导致操作错记录
+function findDeletedById(id) {
+  return deletedRecords.find(r => String(r.id) === String(id));
+}
+
+async function restoreRecord(id) {
+  const dr = findDeletedById(id);
+  if (!dr) { toast('记录不存在或列表已变化，请刷新后重试', 'error'); renderDeletedRecords(); return; }
   const record = {
-    id: Date.now(), client_id: Date.now(),
+    id: dr.client_id || generateClientId(),
+    client_id: dr.client_id || generateClientId(),
     productName: dr.productName || dr.product_name || '',
     batchNo: dr.batchNo || dr.batch_no || '',
     workshop: dr.workshop || '',
@@ -647,13 +701,15 @@ async function restoreRecord(index) {
     rectification: dr.rectification || '',
     remark: dr.remark || ''
   };
+  if (record.client_id !== record.id) record.client_id = record.id;
   try {
     await saveRecordToDB(record);
     // 从数据库中删除已恢复的记录
     if (dr.id) {
-      await sbClient.from('deleted_records').delete().eq('id', dr.id);
+      const { error: delErr } = await sbClient.from('deleted_records').delete().eq('id', dr.id);
+      if (delErr) { console.error('恢复后清理 deleted_records 失败:', delErr); toast('记录已恢复，但从删除列表移除失败，请刷新检查', 'error'); }
     }
-    deletedRecords.splice(index, 1);
+    deletedRecords = deletedRecords.filter(r => String(r.id) !== String(dr.id));
     addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 工序:' + (record.process||'-') + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer + ', 风险:' + (record.riskLevel||'-') + ', 时间:' + (record.discoverTime||'-'));
     await loadData(true);
     populateMonthFilters();
@@ -665,9 +721,9 @@ async function restoreRecord(index) {
   }
 }
 
-async function permanentlyDeleteRecord(index) {
-  const dr = deletedRecords[index];
-  if (!dr) return;
+async function permanentlyDeleteRecord(id) {
+  const dr = findDeletedById(id);
+  if (!dr) { renderDeletedRecords(); return; }
   if (!isExpired(dr)) {
     const remaining = getRemainingDays(dr);
     toast('记录删除未满7天，还需 ' + remaining + ' 天才能永久删除', 'error');
@@ -675,9 +731,10 @@ async function permanentlyDeleteRecord(index) {
   }
   try {
     if (dr.id) {
-      await sbClient.from('deleted_records').delete().eq('id', dr.id);
+      const { error } = await sbClient.from('deleted_records').delete().eq('id', dr.id);
+      if (error) throw error;
     }
-    deletedRecords.splice(index, 1);
+    deletedRecords = deletedRecords.filter(r => String(r.id) !== String(dr.id));
     addLog('永久删除', '产品:' + (dr.productName || dr.product_name) + ', 批号:' + ((dr.batchNo || dr.batch_no)||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + (dr.foreignType || dr.foreign_type) + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel || dr.risk_level||'-') + ', 时间:' + (dr.discoverTime || dr.discover_time||'-'));
     renderDeletedRecords();
     toast('已永久删除');
@@ -690,99 +747,101 @@ async function permanentlyDeleteRecord(index) {
 async function batchPermanentlyDelete() {
   const checked = document.querySelectorAll('.deleted-checkbox:checked');
   if (checked.length === 0) { toast('请先选择要删除的记录', 'error'); return; }
-  // 检查是否有未过期的记录
-  const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index));
-  const notExpired = indices.filter(i => deletedRecords[i] && !isExpired(deletedRecords[i]));
+  const ids = Array.from(checked).map(cb => cb.dataset.id);
+  const targets = ids.map(id => findDeletedById(id)).filter(Boolean);
+  const notExpired = targets.filter(r => !isExpired(r));
   if (notExpired.length > 0) {
     toast('选中的记录中有 ' + notExpired.length + ' 条删除未满7天，无法永久删除', 'error');
     return;
   }
-  showConfirm('批量永久删除', `确定要永久删除选中的 ${checked.length} 条记录吗？此操作不可恢复！`, async () => {
-    const sortedIndices = indices.sort((a,b) => b-a);
-    for (const i of sortedIndices) {
-      const dr = deletedRecords[i];
-      if (dr) {
-        try {
-          if (dr.id) {
-            await sbClient.from('deleted_records').delete().eq('id', dr.id);
-          }
-          addLog('永久删除', '产品:' + (dr.productName || dr.product_name) + ', 批号:' + ((dr.batchNo || dr.batch_no)||'-') + ', 车间:' + dr.workshop + ', 工序:' + (dr.process||'-') + ', 类型:' + (dr.foreignType || dr.foreign_type) + ', 发现人:' + dr.discoverer + ', 风险:' + (dr.riskLevel || dr.risk_level||'-') + ', 时间:' + (dr.discoverTime || dr.discover_time||'-'));
-          deletedRecords.splice(i, 1);
-        } catch(e) {
-          console.error('批量删除失败:', e);
+  showConfirm('批量永久删除', `确定要永久删除选中的 ${targets.length} 条记录吗？此操作不可恢复！`, async () => {
+    let ok = 0, fail = 0;
+    const okIds = [];
+    for (const dr of targets) {
+      try {
+        if (dr.id) {
+          const { error } = await sbClient.from('deleted_records').delete().eq('id', dr.id);
+          if (error) throw error;
         }
+        addLog('永久删除', '产品:' + (dr.productName || '-') + ', 批号:' + (dr.batchNo || '-') + ', 车间:' + (dr.workshop || '-') + ', 类型:' + (dr.foreignType || '-') + ', 发现人:' + (dr.discoverer || '-'));
+        okIds.push(String(dr.id));
+        ok++;
+      } catch(e) {
+        fail++;
+        console.error('批量永久删除失败:', e);
       }
     }
+    deletedRecords = deletedRecords.filter(r => !okIds.includes(String(r.id)));
     renderDeletedRecords();
-    toast(`已永久删除 ${checked.length} 条记录`);
+    if (fail > 0) toast(`永久删除完成：成功 ${ok} 条，失败 ${fail} 条`, 'error');
+    else toast(`已永久删除 ${ok} 条记录`);
   });
 }
 
 async function batchRestore() {
   const checked = document.querySelectorAll('.deleted-checkbox:checked');
   if (checked.length === 0) { toast('请先选择要恢复的记录', 'error'); return; }
-  const indices = Array.from(checked).map(cb => parseInt(cb.dataset.index));
-  const totalCount = indices.length;
+  // 按 id 而非数组下标操作，避免列表变化后错位
+  const ids = Array.from(checked).map(cb => cb.dataset.id);
+  const targets = ids.map(id => findDeletedById(id)).filter(Boolean);
+  const totalCount = targets.length;
   showConfirm('批量恢复确认', `确定要恢复选中的 ${totalCount} 条记录吗？`, async () => {
     try {
       let successCount = 0;
       let failCount = 0;
-      const sortedIndices = indices.sort((a, b) => b - a);
-      
-      // 显示加载提示
+      const restoredIds = [];
+
       const loadingEl = document.getElementById('loadingOverlay');
-      const loadingText = document.getElementById('loadingText');
-      if (loadingEl) loadingEl.classList.remove('hidden');
-      
-      for (let idx = 0; idx < sortedIndices.length; idx++) {
-        const i = sortedIndices[idx];
-        const dr = deletedRecords[i];
-        if (loadingText) loadingText.textContent = `正在恢复 ${idx + 1}/${totalCount}...`;
-        
-        if (dr) {
-          const record = {
-            id: Date.now() + i * 10000 + idx,
-            client_id: Date.now() + i * 10000 + idx,
-            productName: dr.productName || dr.product_name || '',
-            batchNo: dr.batchNo || dr.batch_no || '',
-            workshop: dr.workshop || '',
-            process: dr.process || '',
-            discoverTime: dr.discoverTime || dr.discover_time || '',
-            foreignType: dr.foreignType || dr.foreign_type || '',
-            discoverer: dr.discoverer || '',
-            riskLevel: dr.riskLevel || dr.risk_level || '',
-            description: dr.description || '',
-            sourceAnalysis: dr.sourceAnalysis || dr.source_analysis || '',
-            handleMeasure: dr.handleMeasure || dr.handle_measure || '',
-            handleResult: dr.handleResult || dr.handle_result || '待处理',
-            responsible: dr.responsible || '',
-            rectification: dr.rectification || '',
-            remark: dr.remark || ''
-          };
-          try {
-            await saveRecordToDB(record);
-            if (dr.id) {
-              await sbClient.from('deleted_records').delete().eq('id', dr.id);
-            }
-            addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 工序:' + (record.process||'-') + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer + ', 风险:' + (record.riskLevel||'-') + ', 时间:' + (record.discoverTime||'-'));
-            deletedRecords.splice(i, 1);
-            successCount++;
-          } catch (rowErr) {
-            failCount++;
-            console.error('恢复第' + (idx+1) + '条失败:', rowErr);
+      if (loadingEl) { showLoading('正在恢复 0/' + totalCount + '...'); }
+
+      for (let idx = 0; idx < targets.length; idx++) {
+        const dr = targets[idx];
+        if (loadingEl) { const lt = loadingEl.querySelector('.loading-text'); if (lt) lt.textContent = '正在恢复 ' + (idx + 1) + '/' + totalCount + '...'; }
+
+        const newId = dr.client_id || generateClientId();
+        const record = {
+          id: newId,
+          client_id: newId,
+          productName: dr.productName || dr.product_name || '',
+          batchNo: dr.batchNo || dr.batch_no || '',
+          workshop: dr.workshop || '',
+          process: dr.process || '',
+          discoverTime: dr.discoverTime || dr.discover_time || '',
+          foreignType: dr.foreignType || dr.foreign_type || '',
+          discoverer: dr.discoverer || '',
+          riskLevel: dr.riskLevel || dr.risk_level || '',
+          description: dr.description || '',
+          sourceAnalysis: dr.sourceAnalysis || dr.source_analysis || '',
+          handleMeasure: dr.handleMeasure || dr.handle_measure || '',
+          handleResult: dr.handleResult || dr.handle_result || '待处理',
+          responsible: dr.responsible || '',
+          rectification: dr.rectification || '',
+          remark: dr.remark || ''
+        };
+        try {
+          await saveRecordToDB(record);
+          if (dr.id) {
+            await sbClient.from('deleted_records').delete().eq('id', dr.id);
           }
+          addLog('恢复记录', '产品:' + record.productName + ', 批号:' + (record.batchNo||'-') + ', 车间:' + record.workshop + ', 类型:' + record.foreignType + ', 发现人:' + record.discoverer);
+          restoredIds.push(String(dr.id));
+          successCount++;
+        } catch (rowErr) {
+          failCount++;
+          console.error('恢复第' + (idx+1) + '条失败:', rowErr);
         }
       }
-      
+
       if (loadingEl) loadingEl.classList.add('hidden');
-      
+
+      deletedRecords = deletedRecords.filter(r => !restoredIds.includes(String(r.id)));
       document.querySelectorAll('.deleted-checkbox').forEach(cb => cb.checked = false);
-      document.getElementById('selectAllDeletedCheckbox').checked = false;
-      document.getElementById('deletedBatchActions').style.display = 'none';
+      const sa = document.getElementById('selectAllDeletedCheckbox'); if (sa) sa.checked = false;
+      const ba = document.getElementById('deletedBatchActions'); if (ba) ba.style.display = 'none';
       await loadData(true);
       populateMonthFilters();
       renderDeletedRecords();
-      
+
       if (failCount > 0) {
         toast(`恢复完成：成功 ${successCount} 条，失败 ${failCount} 条`, 'error');
       } else {
@@ -819,14 +878,14 @@ function renderDeletedRecords() {
     const expired = isExpired(r);
     const remaining = getRemainingDays(r);
     const delTime = new Date(r.deletedAt).toLocaleString('zh-CN');
-    html += '<tr><td style="width:36px"><input type="checkbox" class="deleted-checkbox" data-index="' + i + '" onchange="updateDeletedBatchActions()" style="cursor:pointer"></td>' +
+    html += '<tr><td style="width:36px"><input type="checkbox" class="deleted-checkbox" data-id="' + esc(r.id) + '" onchange="updateDeletedBatchActions()" style="cursor:pointer"></td>' +
       '<td>' + (i+1) + '</td><td>' + esc(r.productName||'-') + '</td><td>' + esc(r.batchNo||'-') + '</td><td>' + esc(r.workshop||'-') + '</td><td>' + esc(r.discoverTime||'-') + '</td>' +
       '<td><span class="badge badge-type">' + esc(r.foreignType||'-') + '</span></td><td>' + esc(r.discoverer||'-') + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span>' : '-') + '</td>' +
       '<td style="font-size:12px;color:var(--text2)">' + esc(delTime) + '</td>' +
       '<td>' + (expired ? '<span class="deleted-badge expired">已过期</span>' : '<span class="deleted-badge valid">剩余' + remaining + '天</span>') + '</td>' +
-      '<td><button class="btn btn-sm btn-success" onclick="restoreRecord(' + i + ')">恢复</button>' +
-      (expired ? ' <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteRecord(' + i + ')">永久删除</button>' : '') + '</td></tr>';
+      '<td><button class="btn btn-sm btn-success" onclick="restoreRecord(\'' + esc(r.id) + '\')">↩️ 恢复</button>' +
+      (expired ? ' <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteRecord(\'' + esc(r.id) + '\')">🗑️ 永久删除</button>' : '') + '</td></tr>';
   });
   if (deletedRecords.length === 0) html = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text2)">暂无删除记录</td></tr>';
   document.querySelector('#deletedTable tbody').innerHTML = html;
@@ -953,7 +1012,16 @@ function writeLocalCache() {
   try {
     localStorage.setItem(CACHE_KEY_RECORDS, JSON.stringify(records));
     localStorage.setItem(CACHE_KEY_CONFIG, JSON.stringify(config));
-  } catch (e) {}
+  } catch (e) {
+    // 配额不足时降级：只缓存最近 500 条，保证离线兜底可用；仍失败则只存 config
+    try {
+      localStorage.setItem(CACHE_KEY_RECORDS, JSON.stringify(records.slice(0, 500)));
+      localStorage.setItem(CACHE_KEY_CONFIG, JSON.stringify(config));
+    } catch (e2) {
+      try { localStorage.setItem(CACHE_KEY_CONFIG, JSON.stringify(config)); } catch (e3) {}
+      console.warn('localStorage 写入失败（配额不足），离线缓存可能不完整:', e2 && e2.message);
+    }
+  }
 }
 
 function showLoading(text) {
@@ -969,7 +1037,25 @@ function hideLoading() {
   if (overlay) overlay.classList.add('hidden');
 }
 
-async function loadData(forceRefresh) {
+async function fetchAllRecords() {
+  // 分页拉取，避免单次请求超过 PostgREST 默认 1000 行上限被静默截断
+  const PAGE = 1000;
+  const all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await sbClient.from('records')
+      .select('id,client_id,product_name,batch_no,workshop,process,discover_time,foreign_type,discoverer,risk_level,description,source_analysis,handle_measure,handle_result,responsible,rectification,remark')
+      .order('discover_time', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    all.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
+async function loadData(forceRefresh, silent) {
   const now = Date.now();
   if (!forceRefresh && _dataCache && (now - _dataCacheTime) < DATA_CACHE_TTL) {
     records = _dataCache.records;
@@ -977,14 +1063,13 @@ async function loadData(forceRefresh) {
     return true;
   }
   try {
-    showLoading('正在加载数据...');
-    const [recordsResult, configResult] = await Promise.all([
-      sbClient.from('records').select('id,client_id,product_name,batch_no,workshop,process,discover_time,foreign_type,discoverer,risk_level,description,source_analysis,handle_measure,handle_result,responsible,rectification,remark').order('discover_time', { ascending: false }),
+    if (!silent) showLoading('正在加载数据...');
+    const [rows, configResult] = await Promise.all([
+      fetchAllRecords(),
       sbClient.from('config').select('data').eq('id', 1).single()
     ]);
 
-    if (recordsResult.error) throw recordsResult.error;
-    records = (recordsResult.data || []).map(rowToRecord);
+    records = rows.map(rowToRecord);
 
     if (configResult.error && configResult.error.code !== 'PGRST116') {
       if (configResult.error.message && !configResult.error.message.includes('No rows')) {
@@ -1005,7 +1090,7 @@ async function loadData(forceRefresh) {
     if (_dataCache) {
       records = _dataCache.records;
       config = _dataCache.config;
-      toast('网络较慢，当前显示缓存数据', 'info');
+      if (!silent) toast('网络较慢，当前显示缓存数据', 'info');
       return true;
     }
     const local = readLocalCache();
@@ -1014,25 +1099,20 @@ async function loadData(forceRefresh) {
       config = local.config;
       _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)) };
       _dataCacheTime = now;
-      toast('无法连接服务器，已加载本地缓存数据', 'info');
+      if (!silent) toast('无法连接服务器，已加载本地缓存数据', 'info');
       return true;
     }
-    toast('加载数据失败：' + err.message, 'error');
+    if (!silent) toast('加载数据失败：' + err.message, 'error');
     return false;
   } finally {
     hideLoading();
   }
 }
 
-async function saveData() {
-  // This function is now a no-op since we save directly in each operation
-  return true;
-}
-
 async function saveRecordToDB(record) {
   try {
     const payload = {
-      client_id: record.id,
+      client_id: record.client_id != null ? record.client_id : record.id,
       product_name: record.productName || '',
       batch_no: record.batchNo || '',
       workshop: record.workshop || '',
@@ -1057,9 +1137,6 @@ async function saveRecordToDB(record) {
       .single();
     
     if (error) throw error;
-
-
-
     return data;
   } catch (err) {
     console.error('Save record error:', err);
@@ -1067,26 +1144,21 @@ async function saveRecordToDB(record) {
   }
 }
 
-async function deleteRecordFromDB(clientId) {
+async function deleteRecordFromDB(clientId, fallbackId) {
   try {
-    // images 表设置了 ON DELETE CASCADE，删除记录时自动级联删除图片
-    const { error } = await sbClient
-      .from('records')
-      .delete()
-      .eq('client_id', clientId);
-    
-    if (error) throw error;
+    // 优先按 client_id 删除；若未命中（旧数据无 client_id）则按主键 id 兜底（P10）
+    let res = await sbClient.from('records').delete().eq('client_id', clientId).select('id');
+    if (res.error) throw res.error;
+    if ((!res.data || res.data.length === 0) && fallbackId != null) {
+      res = await sbClient.from('records').delete().eq('id', fallbackId).select('id');
+      if (res.error) throw res.error;
+    }
     return true;
   } catch (err) {
     console.error('Delete record error:', err);
     throw err;
   }
 }
-
-// 从 images 表异步加载记录的图片（按需加载，不在列表查询中拉取）
-
-
-// 迁移旧数据：将 records 表中 base64 图片迁移到独立 images 表
 
 async function saveConfigToDB() {
   try {
@@ -1132,13 +1204,36 @@ function showPage(pageId) {
 }
 
 // ============ DASHBOARD ============
+// 把任意格式的 discoverTime 归一化为 'YYYY-MM'，用于月份统计（P：本月发现为0）
+function getRecordMonthStr(dt) {
+  if (dt == null || dt === '') return '';
+  const v = String(dt).trim();
+  // 纯数字：Excel 序列号
+  if (/^\d+(\.\d+)?$/.test(v)) {
+    const epoch = new Date(1899, 11, 30);
+    const d = new Date(epoch.getTime() + parseFloat(v) * 86400000);
+    if (!isNaN(d)) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    return '';
+  }
+  // YYYY-MM... / YYYY/M... / ISO 时间戳前缀
+  let m = v.match(/^(\d{4})[-/](\d{1,2})/);
+  if (m) return m[1] + '-' + m[2].padStart(2, '0');
+  // 2026年10月 / 10月
+  m = v.match(/^(\d{4})年(\d{1,2})月?/);
+  if (m) return m[1] + '-' + m[2].padStart(2, '0');
+  // 其他交给 Date 解析
+  const d = new Date(v);
+  if (!isNaN(d)) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  return '';
+}
+
 function renderDashboard() {
   const filtered = filterBySelection(records);
   const total = filtered.length;
   
   // Empty state
   if (total === 0 && !filterMonth) {
-    document.getElementById('dashboardStats').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:64px;margin-bottom:16px"></div><div style="font-size:14px;margin-bottom:8px">暂无数据</div><div style="font-size:14px;margin-bottom:24px">点击"快速录入"添加第一条记录</div><button class="btn btn-primary" onclick="showPage(\'entry\')">＋ 快速录入</button></div>';
+    document.getElementById('dashboardStats').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:#94a3b8"><div style="font-size:64px;margin-bottom:16px">📦</div><div style="font-size:14px;margin-bottom:8px">暂无数据</div><div style="font-size:14px;margin-bottom:24px">点击"快速录入"添加第一条记录</div><button class="btn btn-primary" onclick="showPage(\'entry\')">＋ 快速录入</button></div>';
     document.getElementById('typeStatsContainer').innerHTML = '';
     document.getElementById('workshopStatsContainer').innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8">暂无数据</div>';
     document.getElementById('riskStatsContainer').innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8">暂无数据</div>';
@@ -1153,11 +1248,17 @@ function renderDashboard() {
   const rate = total ? Math.round(done / total * 100) : 0;
   const now = new Date();
   const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  const monthCount = filtered.filter(r => r.discoverTime && r.discoverTime.startsWith(thisMonth)).length;
+  // “本月发现”基于全量记录统计，不受年/月筛选影响；日期格式统一归一化后再比对，避免 2026/10/04、时间戳等格式导致匹配失败
+  const monthCount = records.filter(r => getRecordMonthStr(r.discoverTime) === thisMonth).length;
   const highRisk = filtered.filter(r => r.riskLevel === '高风险' || r.riskLevel === '重大风险').length;
   
+  // 统计口径说明：若当前有年/月筛选，标注为筛选范围，避免“累计”误导（P26）
+  const totalLabel = (filterYear || filterMonth)
+    ? ('筛选范围发现数' + (filterYear ? '（' + filterYear + '年' + (filterMonth ? parseInt(filterMonth) + '月' : '') + '）' : ''))
+    : '累计发现总数';
+
   document.getElementById('dashboardStats').innerHTML = 
-    '<div class="stat-card"><div class="stat-icon blue">📊</div><div class="stat-info"><h3>' + total + '</h3><p>累计发现总数</p></div></div>' +
+    '<div class="stat-card"><div class="stat-icon blue">📊</div><div class="stat-info"><h3>' + total + '</h3><p>' + esc(totalLabel) + '</p></div></div>' +
     '<div class="stat-card"><div class="stat-icon orange">⏳</div><div class="stat-info"><h3>' + pending + '</h3><p>待处理数量</p></div></div>' +
     '<div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><h3>' + done + '</h3><p>已完成处理</p></div></div>' +
     '<div class="stat-card"><div class="stat-icon cyan">📈</div><div class="stat-info"><h3>' + rate + '%</h3><p>处理完成率</p></div></div>' +
@@ -1215,7 +1316,7 @@ function renderWorkshopStats(filtered) {
 
 function renderRiskStats(filtered) {
   const riskCount = { '低风险': 0, '中风险': 0, '高风险': 0, '重大风险': 0, '未评估': 0 };
-  filtered.forEach(r => { riskCount[r.riskLevel || '未评估'] = (riskCount[r.riskLevel || '未评估'] || 0) + 1; });
+  filtered.forEach(r => { const lv = RISK_COLORS[r.riskLevel] ? r.riskLevel : '未评估'; riskCount[lv] = (riskCount[lv] || 0) + 1; });
   const total = filtered.length;
   const riskIcons = { '低风险': '🟢', '中风险': '🟡', '高风险': '🟠', '重大风险': '🔴', '未评估': '⬜' };
   const activeRisks = Object.entries(riskCount).filter(e => e[1] > 0);
@@ -1257,9 +1358,9 @@ function renderDashboardCharts(filtered) {
   const wsValues = wsSorted.map(e => e[1]);
   renderBarChart('chartWorkshop', wsLabels, wsValues, wsLabels.map(l => getWorkshopColor(l)));
   
-  // Risk - sorted by count descending
+  // Risk - sorted by count descending（未知风险等级归入“未评估”，避免 NaN）（P25）
   const riskCount = { '低风险': 0, '中风险': 0, '高风险': 0, '重大风险': 0, '未评估': 0 };
-  filtered.forEach(r => { riskCount[r.riskLevel || '未评估']++; });
+  filtered.forEach(r => { const lv = RISK_COLORS[r.riskLevel] ? r.riskLevel : '未评估'; riskCount[lv]++; });
   const riskSorted = Object.entries(riskCount).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
   const riskLabels = riskSorted.map(e => e[0]);
   const riskValues = riskSorted.map(e => e[1]);
@@ -1366,7 +1467,8 @@ async function saveRecord(event) {
   const editId = document.getElementById('editId').value;
   
   const record = {
-    id: editId ? parseInt(editId) : Date.now(),
+    // 编辑时沿用原 id（可能是 UUID 或旧时间戳，不能 parseInt）；新增时生成全局唯一 id
+    id: editId ? editId : String(generateClientId()),
     productName: form.productName.value.trim(),
     batchNo: form.batchNo.value.trim(),
     workshop: form.workshop.value,
@@ -1383,6 +1485,7 @@ async function saveRecord(event) {
     rectification: form.rectification.value.trim(),
     remark: form.remark.value.trim(),
   };
+  record.client_id = record.id;
   
   try {
     const savedRecord = await saveRecordToDB(record);
@@ -1402,32 +1505,43 @@ function resetForm() {
   initEntryForm();
 }
 
-// ============ IMAGE HANDLING ============
-
-
-
 // ============ RECORDS ============
-function renderRecords() {
-  const keyword = document.getElementById('filterKeyword').value.toLowerCase();
+let _keywordDebounce = null;
+function onKeywordInput() {
+  clearTimeout(_keywordDebounce);
+  _keywordDebounce = setTimeout(renderRecords, 300);
+}
+
+function getFilteredRecords() {
+  const keyword = document.getElementById('filterKeyword').value.trim().toLowerCase();
   const dateFrom = document.getElementById('filterDateFrom').value;
   const dateTo = document.getElementById('filterDateTo').value;
   const typeFilter = document.getElementById('filterType').value;
   const workshopFilter = document.getElementById('filterWorkshop').value;
   const riskFilter = document.getElementById('filterRisk').value;
   const statusFilter = document.getElementById('filterStatus').value;
-  
-  let filtered = records.filter(r => {
-    if (keyword && !(r.productName.toLowerCase().includes(keyword) || r.discoverer.toLowerCase().includes(keyword) || (r.description || '').toLowerCase().includes(keyword))) return false;
-    if (dateFrom && r.discoverTime < dateFrom) return false;
-    if (dateTo && r.discoverTime > dateTo) return false;
+
+  return records.filter(r => {
+    if (keyword) {
+      const hay = ((r.productName||'') + ' ' + (r.batchNo||'') + ' ' + (r.discoverer||'') + ' ' + (r.description||'')).toLowerCase();
+      if (!hay.includes(keyword)) return false;
+    }
+    const dt = r.discoverTime || '';
+    if (dateFrom && dt < dateFrom) return false;
+    if (dateTo && dt > dateTo) return false;
     if (typeFilter && r.foreignType !== typeFilter) return false;
     if (workshopFilter && r.workshop !== workshopFilter) return false;
     if (riskFilter && r.riskLevel !== riskFilter) return false;
     if (statusFilter && r.handleResult !== statusFilter) return false;
     return true;
-  });
-  
-  filtered.sort((a, b) => b.discoverTime.localeCompare(a.discoverTime));
+  }).sort((a, b) => String(b.discoverTime||'').localeCompare(String(a.discoverTime||'')));
+}
+
+function renderRecords() {
+  const filtered = getFilteredRecords();
+
+  // 重渲染前记住已勾选的记录 id，渲染后恢复（避免定时刷新丢失勾选）
+  const checkedIds = new Set(Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.dataset.id));
   
   const total = filtered.length;
   const totalPages = Math.ceil(total / pageSize) || 1;
@@ -1437,19 +1551,21 @@ function renderRecords() {
   
   let html = '';
   pageData.forEach((r, i) => {
+    const rid = String(r.id);
     const desc = r.description ? (r.description.length > 15 ? r.description.substring(0, 15) + '...' : r.description) : '-';
     const isToday = r.discoverTime === getTodayStr();
-    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + r.id + '" onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + esc(r.productName) + '</td><td>' + esc(r.batchNo || '-') + '</td><td>' + esc(r.workshop) + '</td><td>' + esc(r.process || '-') + '</td><td>' + esc(r.discoverTime) + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
+    html += '<tr class="' + (isToday ? 'today-row' : '') + '"><td><input type="checkbox" class="record-checkbox" data-id="' + esc(rid) + '"' + (checkedIds.has(rid) ? ' checked' : '') + ' onchange="updateBatchActions()" style="cursor:pointer"></td><td>' + (start + i + 1) + '</td><td>' + esc(r.productName) + '</td><td>' + esc(r.batchNo || '-') + '</td><td>' + esc(r.workshop) + '</td><td>' + esc(r.process || '-') + '</td><td>' + esc(r.discoverTime) + (isToday ? '<span class="today-badge">今日</span>' : '') + '</td>' +
       '<td><span class="badge badge-type">' + esc(r.foreignType) + '</span></td><td>' + esc(r.discoverer) + '</td>' +
       '<td>' + (r.riskLevel ? '<span class="badge badge-' + getRiskBadge(r.riskLevel) + '">' + esc(r.riskLevel) + '</span>' : '-') + '</td>' +
       '<td><span class="badge badge-' + (r.handleResult === '待处理' ? 'pending' : 'done') + '">' + esc(r.handleResult) + '</span></td>' +
       '<td>' + esc(r.responsible || '-') + '</td>' +
       '<td title="' + esc(r.description || '') + '" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' + esc(desc) + '</td>' +
       
-      '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(' + r.id + ')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(' + r.id + ')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(' + r.id + ')">删除</button></td></tr>';
+      '<td><button class="btn btn-sm btn-outline" onclick="viewRecord(\'' + esc(rid) + '\')">查看</button> <button class="btn btn-sm btn-outline" onclick="editRecord(\'' + esc(rid) + '\')">编辑</button> <button class="btn btn-sm btn-danger" onclick="confirmDeleteRecord(\'' + esc(rid) + '\')">删除</button></td></tr>';
   });
   document.querySelector('#recordsTable tbody').innerHTML = html;
   document.getElementById('recordsCount').textContent = '共 ' + total + ' 条记录';
+  updateBatchActions();
   
   // Pagination
   let paginationHtml = '<button ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goToPage(' + (currentPage - 1) + ')">‹</button>';
@@ -1478,7 +1594,7 @@ function goToPage(page) {
 }
 
 function viewRecord(id) {
-  const r = records.find(rec => rec.id === id);
+  const r = records.find(rec => String(rec.id) === String(id));
   if (!r) return;
   
   let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
@@ -1505,7 +1621,7 @@ function viewRecord(id) {
 }
 
 function editRecord(id) {
-  const r = records.find(rec => rec.id === id);
+  const r = records.find(rec => String(rec.id) === String(id));
   if (!r) return;
   
   // 先切换到录入页（会调用 initEntryForm 重置表单和选项）
@@ -1576,15 +1692,22 @@ function renderAnalysis(type) {
     renderPieChart('chartTypePie2', typeLabels, typeValues, typeLabels.map(l => getTypeColor(l)));
     renderBarChart('chartTypeBar', typeLabels, typeValues, typeLabels.map(l => getTypeColor(l)));
     
-    // Type × Month table
-    const months = [...new Set(filtered.map(r => r.discoverTime.substring(0, 7)))].sort();
+    // Type × Month table（防空 discoverTime，P24；预聚合，P35）
+    const months = [...new Set(filtered.map(r => (r.discoverTime || '').substring(0, 7)).filter(m => m.length === 7))].sort();
+    const typeMonthMap = {};
+    filtered.forEach(r => {
+      const m = (r.discoverTime || '').substring(0, 7);
+      if (!m) return;
+      const k = r.foreignType + '\u0001' + m;
+      typeMonthMap[k] = (typeMonthMap[k] || 0) + 1;
+    });
     let tableHtml = '<thead><tr><th>异物类型</th>';
     months.forEach(m => tableHtml += '<th>' + esc(m) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([type, total]) => {
       tableHtml += '<tr><td>' + esc(type) + '</td>';
       months.forEach(m => {
-        const count = filtered.filter(r => r.foreignType === type && r.discoverTime.startsWith(m)).length;
+        const count = typeMonthMap[type + '\u0001' + m] || 0;
         tableHtml += '<td>' + count + '</td>';
       });
       tableHtml += '<td><strong>' + total + '</strong></td></tr>';
@@ -1605,15 +1728,20 @@ function renderAnalysis(type) {
     renderPieChart('chartWorkshopPie', wsLabels, wsValues, wsLabels.map(l => getWorkshopColor(l)));
     renderBarChart('chartWorkshopBar', wsLabels, wsValues, wsLabels.map(l => getWorkshopColor(l)));
     
-    // Workshop × Type table
+    // Workshop × Type table（预聚合，P35）
     const types = [...new Set(filtered.map(r => r.foreignType))].sort();
+    const wsTypeMap = {};
+    filtered.forEach(r => {
+      const k = r.workshop + '\u0001' + r.foreignType;
+      wsTypeMap[k] = (wsTypeMap[k] || 0) + 1;
+    });
     let tableHtml = '<thead><tr><th>车间</th>';
     types.forEach(t => tableHtml += '<th>' + esc(t) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([ws, total]) => {
       tableHtml += '<tr><td>' + esc(ws) + '</td>';
       types.forEach(t => {
-        const count = filtered.filter(r => r.workshop === ws && r.foreignType === t).length;
+        const count = wsTypeMap[ws + '\u0001' + t] || 0;
         tableHtml += '<td>' + count + '</td>';
       });
       tableHtml += '<td><strong>' + total + '</strong></td></tr>';
@@ -1674,15 +1802,20 @@ function renderAnalysis(type) {
     renderBarChart('chartProductBar', prodLabels, sorted.map(s => s[1]), prodColors);
     renderPieChart('chartProductPie', prodLabels, sorted.map(s => s[1]), prodColors);
     
-    // Product × Type table
+    // Product × Type table（P35：一次遍历预聚合，避免双重循环内反复 filter）
     const types = [...new Set(filtered.map(r => r.foreignType))].sort();
+    const prodTypeMap = {};
+    filtered.forEach(r => {
+      const k = r.productName + '\u0001' + r.foreignType;
+      prodTypeMap[k] = (prodTypeMap[k] || 0) + 1;
+    });
     let tableHtml = '<thead><tr><th>产品</th>';
     types.forEach(t => tableHtml += '<th>' + esc(t) + '</th>');
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([prod, total]) => {
       tableHtml += '<tr><td>' + esc(prod) + '</td>';
       types.forEach(t => {
-        const count = filtered.filter(r => r.productName === prod && r.foreignType === t).length;
+        const count = prodTypeMap[prod + '\u0001' + t] || 0;
         tableHtml += '<td>' + count + '</td>';
       });
       tableHtml += '<td><strong>' + total + '</strong></td></tr>';
@@ -1703,15 +1836,22 @@ function renderAnalysis(type) {
     renderBarChart('chartPersonBar', personLabels, sorted.map(s => s[1]), personColors);
     renderPieChart('chartPersonPie', personLabels, sorted.map(s => s[1]), personColors);
     
-    // Person × Month table
-    const months = [...new Set(filtered.map(r => r.discoverTime.substring(0, 7)))].sort();
+    // Person × Month table（防空 discoverTime，P24；预聚合，P35）
+    const months = [...new Set(filtered.map(r => (r.discoverTime || '').substring(0, 7)).filter(m => m.length === 7))].sort();
+    const personMonthMap = {};
+    filtered.forEach(r => {
+      const m = (r.discoverTime || '').substring(0, 7);
+      if (!m) return;
+      const k = r.discoverer + '\u0001' + m;
+      personMonthMap[k] = (personMonthMap[k] || 0) + 1;
+    });
     let tableHtml = '<thead><tr><th>发现人</th>';
     months.forEach(m => { tableHtml += '<th>' + esc(m) + '</th>'; });
     tableHtml += '<th>合计</th></tr></thead><tbody>';
     sorted.forEach(([person, total]) => {
       tableHtml += '<tr><td>' + esc(person) + '</td>';
       months.forEach(m => {
-        const count = filtered.filter(r => r.discoverer === person && r.discoverTime.startsWith(m)).length;
+        const count = personMonthMap[person + '\u0001' + m] || 0;
         tableHtml += '<td>' + count + '</td>';
       });
       tableHtml += '<td><strong>' + total + '</strong></td></tr>';
@@ -1722,7 +1862,7 @@ function renderAnalysis(type) {
     renderPersonRanking(filtered);
   } else if (type === 'risk') {
     const riskCount = { '低风险': 0, '中风险': 0, '高风险': 0, '重大风险': 0, '未评估': 0 };
-    filtered.forEach(r => { riskCount[r.riskLevel || '未评估']++; });
+    filtered.forEach(r => { const lv = RISK_COLORS[r.riskLevel] ? r.riskLevel : '未评估'; riskCount[lv]++; });
     const riskEntries = Object.entries(riskCount).filter(([k, v]) => v > 0);
     
     const highRisk = filtered.filter(r => r.riskLevel === '高风险' || r.riskLevel === '重大风险');
@@ -1770,17 +1910,27 @@ function renderAnalysis(type) {
   }
 }
 
-function filterByMonth(data, month) {
-  return data.filter(r => r.discoverTime && r.discoverTime.startsWith(month));
-}
-
 // ============ CONFIG ============
+function removeConfig(key, idx) {
+  const item = (config[key] || [])[idx];
+  if (item === undefined) return;
+  showConfirm('删除确认', '确定要删除「' + item + '」吗？删除后配置将无法恢复！', async () => {
+    config[key] = config[key].filter(x => x !== item);
+    await saveConfigToDB();
+    renderConfig();
+    toast('已删除: ' + item);
+  });
+}
 function renderConfig() {
-  document.getElementById('foreignTypeList').innerHTML = config.foreignTypes.map(t => '<div class="config-tag">' + esc(t) + ' <span class="remove" onclick="removeConfig(\'foreignTypes\',' + JSON.stringify(t) + ')">×</span></div>').join('');
-  document.getElementById('workshopList').innerHTML = config.workshops.map(w => '<div class="config-tag">' + esc(w) + ' <span class="remove" onclick="removeConfig(\'workshops\',' + JSON.stringify(w) + ')">×</span></div>').join('');
-  document.getElementById('discovererList').innerHTML = config.discoverers.map(d => '<div class="config-tag">' + esc(d) + ' <span class="remove" onclick="removeConfig(\'discoverers\',' + JSON.stringify(d) + ')">×</span></div>').join('');
-  document.getElementById('productList2').innerHTML = config.products.map(p => '<div class="config-tag">' + esc(p) + ' <span class="remove" onclick="removeConfig(\'products\',' + JSON.stringify(p) + ')">×</span></div>').join('');
-  document.getElementById('processList2').innerHTML = config.processes.map(p => '<div class="config-tag">' + esc(p) + ' <span class="remove" onclick="removeConfig(\'processes\',' + JSON.stringify(p) + ')">×</span></div>').join('');
+  // 按下标传参，避免名称中的引号击穿 HTML 属性（P04）
+  const renderList = (elId, key) => {
+    document.getElementById(elId).innerHTML = (config[key] || []).map((t, i) => '<div class="config-tag">' + esc(t) + ' <span class="remove" onclick="removeConfig(\'' + key + '\',' + i + ')">×</span></div>').join('');
+  };
+  renderList('foreignTypeList', 'foreignTypes');
+  renderList('workshopList', 'workshops');
+  renderList('discovererList', 'discoverers');
+  renderList('productList2', 'products');
+  renderList('processList2', 'processes');
 }
 
 async function addForeignType() {
@@ -1838,27 +1988,6 @@ async function addProcess() {
   toast('已添加: ' + n);
 }
 
-function removeConfig(key, item) {
-  showConfirm('删除确认', '确定要删除「' + item + '」吗？删除后配置将无法恢复！', async () => {
-    config[key] = config[key].filter(x => x !== item);
-    await saveConfigToDB();
-    renderConfig();
-    toast('已删除: ' + item);
-  });
-}
-
-async function clearAllRecords() {
-  try {
-    await sbClient.from('records').delete().neq('id', 0);
-    records = [];
-    toast('所有记录已清空');
-    populateMonthFilters();
-    renderDashboard();
-  } catch (err) {
-    toast('清空失败: ' + err.message, 'error');
-  }
-}
-
 async function resetConfig() {
   config = {
     foreignTypes: ['毛发', '塑料', '金属', '玻璃', '昆虫', '纸屑', '布屑', '橡胶', '其它异物'],
@@ -1874,7 +2003,7 @@ async function resetConfig() {
 
 // ============ IMPORT/EXPORT ============
 async function exportJSON() {
-  showLoading('正在导出图片...');
+  showLoading('正在导出备份...');
   try {
     const blob = new Blob([JSON.stringify({ config, records }, null, 2)], { type: 'application/json' });
     downloadBlob(blob, '异物管理系统备份_' + getTodayStr() + '.json');
@@ -1886,12 +2015,24 @@ async function exportJSON() {
   }
 }
 
+// CSV 公式注入防护：以 = + - @ 开头的单元格前置单引号，避免 Excel 执行公式（P05）
+function csvEscape(v) {
+  let s = (v == null ? '' : String(v));
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 function exportCSV() {
+  // 导出当前筛选结果（记录页使用筛选条件，导入导出页导出全部）（P27）
+  const activePage = document.querySelector('.page.active');
+  const useFilter = activePage && activePage.id === 'page-records';
+  const data = useFilter ? getFilteredRecords() : records;
   const headers = ['序号','产品名称','批号','车间','工序','发现时间','异物类型','发现人','风险等级','描述','来源分析','处理措施','处理结果','责任人','整改情况','备注'];
-  const rows = records.map((r, i) => [i+1, r.productName, r.batchNo, r.workshop, r.process, r.discoverTime, r.foreignType, r.discoverer, r.riskLevel, r.description, r.sourceAnalysis, r.handleMeasure, r.handleResult, r.responsible, r.rectification, r.remark].map(v => '"' + (v || '').toString().replace(/"/g, '""') + '"').join(','));
+  const rows = data.map((r, i) => [i+1, r.productName, r.batchNo, r.workshop, r.process, r.discoverTime, r.foreignType, r.discoverer, r.riskLevel, r.description, r.sourceAnalysis, r.handleMeasure, r.handleResult, r.responsible, r.rectification, r.remark].map(csvEscape).join(','));
   const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '异物发现记录_' + getTodayStr() + '.csv');
-  toast('CSV 导出成功');
+  const suffix = useFilter && data.length !== records.length ? '_筛选结果' : '';
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '异物发现记录' + suffix + '_' + getTodayStr() + '.csv');
+  toast(useFilter ? 'CSV 导出成功（当前筛选共 ' + data.length + ' 条）' : 'CSV 导出成功');
 }
 
 function downloadBlob(blob, name) {
@@ -1905,37 +2046,66 @@ function downloadBlob(blob, name) {
 async function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
-  showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据到现有记录，是否继续？', async () => {
+  showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据：带 client_id 且与现有记录相同的将被更新，其余作为新记录添加。是否继续？', async () => {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
       const d = JSON.parse(ev.target.result);
-      if (d.config) {
-        config = d.config;
+      if (d.config && typeof d.config === 'object') {
+        config = { ...config, ...d.config };
         await saveConfigToDB();
       }
-      if (d.records) {
-        for (const r of d.records) {
-          await saveRecordToDB(r);
+      if (Array.isArray(d.records) && d.records.length > 0) {
+        showLoading('正在导入 0/' + d.records.length + '...');
+        const existingIds = new Set(records.map(r => String(r.client_id || r.id)));
+        let added = 0, updated = 0, failed = 0;
+        for (let i = 0; i < d.records.length; i++) {
+          const r = d.records[i];
+          try {
+            // 有 client_id 且已存在 → 更新；否则分配新 id 作为新增，避免静默覆盖无关记录（P12）
+            const hasValidId = r.client_id && existingIds.has(String(r.client_id));
+            const rec = { ...r };
+            if (!hasValidId) {
+              rec.id = String(generateClientId());
+              rec.client_id = rec.id;
+              added++;
+            } else {
+              updated++;
+            }
+            await saveRecordToDB(rec);
+          } catch (rowErr) {
+            failed++;
+            console.error('导入第' + (i+1) + '条失败:', rowErr);
+          }
+          if (i % 20 === 0) {
+            const lt = document.querySelector('#loadingOverlay .loading-text');
+            if (lt) lt.textContent = '正在导入 ' + (i+1) + '/' + d.records.length + '...';
+          }
         }
-        records = d.records;
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        await loadData(true);
+        populateMonthFilters();
+        renderDashboard();
+        let msg = '导入完成：新增 ' + added + ' 条，更新 ' + updated + ' 条';
+        if (failed > 0) { msg += '，失败 ' + failed + ' 条'; toast(msg, 'error'); }
+        else toast(msg);
+      } else {
+        toast('文件中没有可导入的记录', 'error');
       }
-      await loadData();
-      populateMonthFilters();
-      renderDashboard();
-      toast('导入成功，共 ' + records.length + ' 条记录');
     } catch (err) {
+      const lo = document.getElementById('loadingOverlay'); if (lo) lo.classList.add('hidden');
       toast('解析失败: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
+  e.target.value = '';
   });
 }
 
 async function importCSV(e) {
   const file = e.target.files[0];
   if (!file) return;
-  showConfirm('导入确认', '导入将合并 ' + file.name + ' 中的数据到现有记录，是否继续？', async () => {
+  showConfirm('导入确认', '导入将添加 ' + file.name + ' 中的记录（已校验表头），是否继续？', async () => {
   try {
     let rows = [];
     const ext = file.name.split('.').pop().toLowerCase();
@@ -1955,45 +2125,78 @@ async function importCSV(e) {
       rows = lines.map(l => parseCSVLine(l));
     }
     
-    if (rows.length < 2) { toast('文件为空', 'error'); return; }
-    
-    let imported = 0;
-    // 跳过标题行（第一行）
-    for (let i = 1; i < rows.length; i++) {
-      const cols = rows[i];
-      if (!cols || cols.length < 7) continue;
-      // 跳过空行
-      if (!cols[1] && !cols[5]) continue;
-      
-      const record = {
-        id: Date.now() + i,
-        productName: cols[1] || '',
-        batchNo: cols[2] || '',
-        workshop: cols[3] || '',
-        process: cols[4] || '',
-        discoverTime: formatExcelDate(cols[5]) || '',
-        foreignType: cols[6] || '',
-        discoverer: cols[7] || '',
-        riskLevel: cols[8] || '',
-        description: cols[9] || '',
-        sourceAnalysis: cols[10] || '',
-        handleMeasure: cols[11] || '',
-        handleResult: cols[12] || '待处理',
-        responsible: cols[13] || '',
-        rectification: cols[14] || '',
-        remark: cols[15] || '',
-        images: []
-      };
-      await saveRecordToDB(record);
-      imported++;
+    if (rows.length < 2) { toast('文件为空或只有表头', 'error'); return; }
+
+    // 表头校验（P13）：防止列错位静默导入脏数据。第一列可以是“序号”也可以是“产品名称”
+    const header = (rows[0] || []).map(h => String(h || '').trim());
+    const expected = ['产品名称','批号','车间','工序','发现时间','异物类型','发现人'];
+    const withIndex = header[0] === '序号';
+    const base = withIndex ? 1 : 0;
+    let headerOk = true;
+    for (let i = 0; i < expected.length; i++) {
+      if (header[base + i] !== expected[i]) { headerOk = false; break; }
     }
-    await loadData();
+    if (!headerOk) {
+      toast('表头不匹配：前几列应为 ' + (withIndex ? '' : '序号,') + expected.join(',') + '，实际为：' + header.slice(0, 8).join(',') + '。请按导出模板格式整理后重试', 'error');
+      return;
+    }
+
+    showLoading('正在导入 0/' + (rows.length - 1) + '...');
+    let imported = 0, skipped = 0, failed = 0;
+    // 先收集行数据，再分批生成唯一 id（避免 Date.now()+i 碰撞，P09）
+    const pending = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i] || [];
+      const c = withIndex ? cols : ([null].concat(cols)); // 统一成带序号列的下标布局
+      const productName = String(c[base === 0 ? 0 : 1] || c[1] || '').trim();
+      const discoverTime = formatExcelDate(c[5]) || '';
+      if (!productName && !discoverTime) { skipped++; continue; } // 空行
+      pending.push({
+        productName: String(c[1] || '').trim(),
+        batchNo: String(c[2] || '').trim(),
+        workshop: String(c[3] || '').trim(),
+        process: String(c[4] || '').trim(),
+        discoverTime: discoverTime,
+        foreignType: String(c[6] || '').trim(),
+        discoverer: String(c[7] || '').trim(),
+        riskLevel: String(c[8] || '').trim(),
+        description: String(c[9] || '').trim(),
+        sourceAnalysis: String(c[10] || '').trim(),
+        handleMeasure: String(c[11] || '').trim(),
+        handleResult: String(c[12] || '').trim() || '待处理',
+        responsible: String(c[13] || '').trim(),
+        rectification: String(c[14] || '').trim(),
+        remark: String(c[15] || '').trim()
+      });
+    }
+    const ids = generateClientIds(pending.length);
+    for (let i = 0; i < pending.length; i++) {
+      const record = { id: String(ids[i]), client_id: ids[i], ...pending[i] };
+      try {
+        await saveRecordToDB(record);
+        imported++;
+      } catch (rowErr) {
+        failed++;
+        console.error('导入第' + (i+1) + '条失败:', rowErr);
+      }
+      if (i % 20 === 0) {
+        const lt = document.querySelector('#loadingOverlay .loading-text');
+        if (lt) lt.textContent = '正在导入 ' + (i+1) + '/' + pending.length + '...';
+      }
+    }
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    await loadData(true);
     populateMonthFilters();
     renderDashboard();
-    toast('导入成功，共 ' + imported + ' 条记录');
+    let msg = '导入完成：成功 ' + imported + ' 条';
+    if (skipped > 0) msg += '，跳过空行 ' + skipped + ' 条';
+    if (failed > 0) { msg += '，失败 ' + failed + ' 条'; toast(msg, 'error'); }
+    else toast(msg);
   } catch (err) {
+    const lo = document.getElementById('loadingOverlay'); if (lo) lo.classList.add('hidden');
     toast('解析失败: ' + err.message, 'error');
   }
+  e.target.value = '';
   });
 }
 
@@ -2110,40 +2313,37 @@ function deselectAll() {
 }
 
 function batchDelete() {
-  const ids = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => parseInt(cb.dataset.id));
+  const ids = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.dataset.id);
   if (ids.length === 0) return;
   showConfirm('批量删除确认', '确定要删除选中的 ' + ids.length + ' 条记录吗？删除后可在"最近删除"中恢复。', async () => {
-    try {
-      for (const id of ids) {
-        await moveToDeleted(id);
-      }
-      document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
-      document.getElementById('selectAllCheckbox').checked = false;
-      document.getElementById('batchActions').style.display = 'none';
-      await loadData(true);
-      populateMonthFilters();
-      toast('已删除 ' + ids.length + ' 条记录，可在"最近删除"中恢复');
-      renderRecords();
-    } catch (err) {
-      toast('删除失败：' + err.message, 'error');
+    // 逐条删除并如实统计成功/失败，moveToDeleted 返回 boolean
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      const res = await moveToDeleted(id);
+      if (res) ok++; else fail++;
     }
+    document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    document.getElementById('batchActions').style.display = 'none';
+    await loadData(true);
+    populateMonthFilters();
+    if (fail > 0) toast('删除完成：成功 ' + ok + ' 条，失败 ' + fail + ' 条（失败记录未删除）', 'error');
+    else toast('已删除 ' + ok + ' 条记录，可在"最近删除"中恢复');
+    renderRecords();
   });
 }
 
 function confirmDeleteRecord(id) {
   showConfirm('删除确认', '确定要删除这条记录吗？删除后可在"最近删除"中恢复。', async () => {
-    try {
-      await moveToDeleted(id);
-      document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
-      document.getElementById('selectAllCheckbox').checked = false;
-      document.getElementById('batchActions').style.display = 'none';
-      await loadData(true);
-      populateMonthFilters();
-      toast('已删除，可在"最近删除"中恢复');
-      renderRecords();
-    } catch (err) {
-      toast('删除失败：' + err.message, 'error');
-    }
+    const ok = await moveToDeleted(id);
+    if (!ok) return; // moveToDeleted 内部已提示失败原因
+    document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    document.getElementById('batchActions').style.display = 'none';
+    await loadData(true);
+    populateMonthFilters();
+    toast('已删除，可在"最近删除"中恢复');
+    renderRecords();
   });
 }
 
@@ -2184,13 +2384,6 @@ function renderWeeklyStats(filtered) {
   });
   
   const weeks = Object.keys(weekMap).sort().reverse();
-  
-  // Week stats cards
-  const statsHtml = weeks.slice(0, 6).map(wk => {
-    const w = weekMap[wk];
-    return '<div class="stat-card"><div class="stat-icon blue">📅</div><div class="stat-info"><h3>' + w.count + '</h3><p>' + w.label + '</p></div></div>';
-  }).join('');
-  // Cards removed - table only
   
   // Week detail table
   const allTypes = [...new Set(filtered.map(r => r.foreignType).filter(Boolean))];
@@ -2278,7 +2471,7 @@ function renderPersonRanking(data) {
       });
       var typeStr = Object.keys(typeDetail).map(function(t) { return esc(t) + '(' + typeDetail[t] + ')'; }).join('、');
       
-      var medal = idx === 0 ? '' : idx === 1 ? '' : idx === 2 ? '' : '';
+      var medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
       var rowStyle = idx === 0 ? 'background: #fef9c3' : idx === 1 ? 'background: #f0f4f8' : idx === 2 ? 'background: #ffedd5' : '';
       
       html += '<tr style="' + rowStyle + '">';
@@ -2346,6 +2539,11 @@ function addBatchRow() {
   renderBatchTable();
 }
 
+// P03: option 值/文本统一转义，防止配置项中的特殊字符造成 XSS
+function batchOpt(v, sel) {
+  return '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(v) + '</option>';
+}
+
 function renderBatchTable() {
   const tbody = document.getElementById('batchBody');
   if (!tbody) return;
@@ -2354,16 +2552,18 @@ function renderBatchTable() {
     document.getElementById('batchCount').textContent = '共 0 条待提交';
     return;
   }
+  // P33: 下拉选项在循环外生成一次（config 对所有行相同，仅 selected 需逐行判断），避免 O(n×m) 字符串拼接
+  const riskLevels = ['未评估','低风险','中风险','高风险','重大风险'];
+  const resultLevels = ['待处理','已处理','已关闭'];
   let html = '';
   batchRows.forEach((row, idx) => {
-    const productOpts = config.products.map(p => '<option value="'+p+'"'+(p===row.productName?' selected':'')+'>'+p+'</option>').join('');
-    const workshopOpts = config.workshops.map(w => '<option value="'+w+'"'+(w===row.workshop?' selected':'')+'>'+w+'</option>').join('');
-    const processOpts = config.processes.map(p => '<option value="'+p+'"'+(p===row.process?' selected':'')+'>'+p+'</option>').join('');
-    const typeOpts = config.foreignTypes.map(t => '<option value="'+t+'"'+(t===row.foreignType?' selected':'')+'>'+t+'</option>').join('');
-    const discovererOpts = config.discoverers.map(d => '<option value="'+d+'"'+(d===row.discoverer?' selected':'')+'>'+d+'</option>').join('');
-    const riskLevels = ['未评估','低风险','中风险','高风险','重大风险'];
-    const riskOpts = riskLevels.map(r => '<option value="'+r+'"'+(r===row.riskLevel?' selected':'')+'>'+r+'</option>').join('');
-    const resultOpts = ['待处理','已处理','已关闭'].map(s => '<option value="'+s+'"'+(s===row.handleResult?' selected':'')+'>'+s+'</option>').join('');
+    const productOpts = config.products.map(p => batchOpt(p, row.productName)).join('');
+    const workshopOpts = config.workshops.map(w => batchOpt(w, row.workshop)).join('');
+    const processOpts = config.processes.map(p => batchOpt(p, row.process)).join('');
+    const typeOpts = config.foreignTypes.map(t => batchOpt(t, row.foreignType)).join('');
+    const discovererOpts = config.discoverers.map(d => batchOpt(d, row.discoverer)).join('');
+    const riskOpts = riskLevels.map(r => batchOpt(r, row.riskLevel)).join('');
+    const resultOpts = resultLevels.map(s => batchOpt(s, row.handleResult)).join('');
 
     const status = row._status || '';
     let rowStyle = '';
@@ -2373,13 +2573,13 @@ function renderBatchTable() {
       statusIcon = '✅';
     } else if (status === 'failed') {
       rowStyle = 'background:#fef2f2 !important;';
-      statusIcon = '<span title="' + (row._error || '').replace(/"/g, '&quot;') + '">❌</span>';
+      statusIcon = '<span title="' + esc(row._error || '') + '">❌</span>';
     } else if (status === 'submitting') {
       rowStyle = 'background:#eff6ff !important;';
       statusIcon = '⏳';
     }
 
-    html += '<tr style="' + rowStyle + '">' +
+    html += '<tr data-batch-idx="' + idx + '" style="' + rowStyle + '">' +
       '<td>' + (status === 'success' ? statusIcon : statusIcon + ' <button class="btn btn-sm btn-danger" onclick="removeBatchRow('+idx+')" style="padding:2px 6px;font-size:11px">✕</button>') + '</td>' +
       '<td>' + (idx+1) + '</td>' +
       '<td><select class="form-select" style="min-width:100px;padding:4px 8px;font-size:12px" onchange="updateBatchRow('+idx+',\'productName\',this.value)"><option value="">请选择</option>' + productOpts + '</select></td>' +
@@ -2399,7 +2599,7 @@ function renderBatchTable() {
       '<td><input class="form-input" style="min-width:80px;padding:4px 8px;font-size:12px" value="'+esc(row.remark||'')+'" onchange="updateBatchRow('+idx+',\'remark\',this.value)" placeholder="备注"></td>' +
       '</tr>';
     if (status === 'failed' && row._error) {
-      html += '<tr style="background:#fef2f2"><td colspan="17" style="padding:4px 12px;font-size:11px;color:#dc2626;border-bottom:2px solid #fecaca">❌ 提交失败：' + row._error.replace(/</g, '&lt;') + '</td></tr>';
+      html += '<tr data-batch-err="' + idx + '" style="background:#fef2f2"><td colspan="17" style="padding:4px 12px;font-size:11px;color:#dc2626;border-bottom:2px solid #fecaca">❌ 提交失败：' + esc(row._error) + '</td></tr>';
     }
   });
   tbody.innerHTML = html;
@@ -2410,6 +2610,24 @@ function renderBatchTable() {
 function updateBatchRow(idx, field, value) {
   if (idx >= 0 && idx < batchRows.length) {
     batchRows[idx][field] = value;
+  }
+}
+
+// P33: 提交过程中只更新单行状态样式，不全量重建表格（原 O(n²) 卡顿）
+function updateBatchRowStatusUI(idx) {
+  const row = batchRows[idx];
+  const tr = document.querySelector('tr[data-batch-idx="' + idx + '"]');
+  if (!row || !tr) return;
+  const status = row._status || '';
+  if (status === 'success') { tr.style.cssText = 'background:#f0fdf4 !important;opacity:0.5;'; }
+  else if (status === 'failed') { tr.style.cssText = 'background:#fef2f2 !important;'; }
+  else if (status === 'submitting') { tr.style.cssText = 'background:#eff6ff !important;'; }
+  else { tr.style.cssText = ''; }
+  const firstCell = tr.cells[0];
+  if (firstCell) {
+    if (status === 'success') firstCell.innerHTML = '✅';
+    else if (status === 'failed') firstCell.innerHTML = '<span title="' + esc(row._error || '') + '">❌</span>';
+    else if (status === 'submitting') firstCell.innerHTML = '⏳';
   }
 }
 
@@ -2455,57 +2673,66 @@ async function submitBatch() {
   batchRows.forEach(row => { if (row._status !== 'success') { row._status = ''; row._error = ''; } });
   renderBatchTable();
   
+  // P09: 预先生成全局唯一 id，避免 Date.now()+i*10000+随机数碰撞导致 upsert 静默覆盖
+  const pendingIdx = batchRows.map((r, i) => r._status === 'success' ? -1 : i).filter(i => i >= 0);
+  const uniqueIds = generateClientIds(pendingIdx.length);
+  const idMap = new Map();
+  pendingIdx.forEach((ri, k) => idMap.set(ri, uniqueIds[k]));
+
   let success = 0, failed = 0;
-  const total = batchRows.filter(r => r._status !== 'success').length;
+  const total = pendingIdx.length;
   const successItems = [];
   const failedItems = [];
   let processed = 0;
-  
-  for (let i = 0; i < batchRows.length; i++) {
-    const row = batchRows[i];
-    if (row._status === 'success') continue;
-    
-    processed++;
-    progressText.textContent = '正在提交 ' + processed + '/' + total + '...';
-    progressBar.style.width = (processed/total*100) + '%';
-    
-    row._status = 'submitting';
-    renderBatchTable();
-    
-    try {
-      const record = {
-        id: Date.now() + i * 10000 + Math.floor(Math.random()*99999),
-        productName: row.productName,
-        batchNo: row.batchNo,
-        workshop: row.workshop,
-        process: row.process,
-        discoverTime: row.discoverTime,
-        foreignType: row.foreignType,
-        discoverer: row.discoverer,
-        riskLevel: row.riskLevel,
-        description: row.description,
-        sourceAnalysis: row.sourceAnalysis,
-        handleMeasure: row.handleMeasure,
-        handleResult: row.handleResult,
-        responsible: row.responsible,
-        rectification: row.rectification,
-        remark: row.remark
-      };
-      await saveRecordToDB(record);
-      success++;
-      row._status = 'success';
-      successItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer });
-    } catch (err) {
-      failed++;
-      row._status = 'failed';
-      row._error = err.message || '未知错误';
-      failedItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer, error: err.message || '未知错误' });
-      console.error('Batch submit row ' + (i+1) + ' error:', err);
+
+  // P34: 去掉每行 200ms 人为延迟，改为 3 路并发提交（限并发避免压垮 API）
+  const CONCURRENCY = 3;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < pendingIdx.length) {
+      const i = pendingIdx[cursor++];
+      const row = batchRows[i];
+      row._status = 'submitting';
+      updateBatchRowStatusUI(i);
+      try {
+        const record = {
+          id: String(idMap.get(i)),
+          client_id: idMap.get(i),
+          productName: row.productName,
+          batchNo: row.batchNo,
+          workshop: row.workshop,
+          process: row.process,
+          discoverTime: row.discoverTime,
+          foreignType: row.foreignType,
+          discoverer: row.discoverer,
+          riskLevel: row.riskLevel,
+          description: row.description,
+          sourceAnalysis: row.sourceAnalysis,
+          handleMeasure: row.handleMeasure,
+          handleResult: row.handleResult,
+          responsible: row.responsible,
+          rectification: row.rectification,
+          remark: row.remark
+        };
+        await saveRecordToDB(record);
+        success++;
+        row._status = 'success';
+        successItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer });
+      } catch (err) {
+        failed++;
+        row._status = 'failed';
+        row._error = err.message || '未知错误';
+        failedItems.push({ rowNum: i+1, product: row.productName, workshop: row.workshop, type: row.foreignType, discoverer: row.discoverer, error: err.message || '未知错误' });
+        console.error('Batch submit row ' + (i+1) + ' error:', err);
+      }
+      processed++;
+      progressText.textContent = '正在提交 ' + processed + '/' + total + '...';
+      progressBar.style.width = (processed/total*100) + '%';
+      updateBatchRowStatusUI(i);
     }
-    renderBatchTable();
-    
-    await new Promise(resolve => setTimeout(resolve, 200));
   }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pendingIdx.length) }, worker));
+  renderBatchTable(); // 完成后全量刷新一次（展示失败详情行）
   
   await loadData(true);
   populateMonthFilters();
@@ -2695,8 +2922,14 @@ function onAnalysisFilterChange(type) {
 }
 
 async function init() {
+  // 客户端初始化失败（脚本未加载）时不再抛错，由顶部守护展示错误提示
+  if (!sbClient) return;
+
   // Ensure all overlays are hidden
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+
+  // 先校正服务器时间（P07），失败不阻塞
+  await syncServerTime();
 
   updateClock();
   setInterval(updateClock, 60000);
@@ -2714,14 +2947,41 @@ async function init() {
   }
 }
 
+// ============ 多端同步（P16）============
+// 每 60 秒静默刷新数据；只在页面可见时拉取，刷新后重渲染当前活动页（不打断筛选，筛选值由 renderRecords 保留）
+// 数据指纹：内容无变化时跳过重渲染，避免定时刷新导致页面可见闪烁
+function _dataSignature() {
+  let h = records.length * 31 + deletedRecords.length * 7;
+  for (const r of records) { const s = String(r.id) + String(r.handleResult) + String(r.discoverTime); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; }
+  for (const d of deletedRecords) { const s = String(d.id); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; }
+  return h;
+}
+let _lastRenderSig = null;
 
-// Auto-refresh today highlight every 60 seconds
-setInterval(() => {
-  const activePage = document.querySelector('.page.active');
-  if (activePage && activePage.id === 'page-records') {
-    renderRecords();
-  }
-}, 60000);
+async function silentRefresh() {
+  if (!sbClient || document.hidden) return;
+  // 录入/批量提交进行中不打断
+  const submitting = batchRows.some(r => r._status === 'submitting');
+  if (submitting) return;
+  try {
+    await loadData(true, true); // 静默模式：不弹加载遮罩、不弹 toast，避免页面周期性闪烁
+    // 数据没变化就什么都不做（不重建图表/表格，页面无闪烁）
+    const sig = _dataSignature();
+    if (sig === _lastRenderSig) return;
+    _lastRenderSig = sig;
+    const activePage = document.querySelector('.page.active');
+    if (!activePage) return;
+    const pageId = activePage.id.replace('page-', '');
+    if (pageId === 'records') renderRecords();
+    else if (pageId === 'dashboard') renderDashboard();
+    else if (pageId === 'deleted') renderDeletedRecords();
+    // 其余页面由用户切换时自行重渲染，避免打断录入/批量操作
+  } catch (e) { console.warn('后台刷新失败:', e); }
+}
+
+
+// 定时静默同步：刷新数据并重渲染（取代原来只刷“今日高亮”的 60 秒定时器，P16/P22）
+setInterval(silentRefresh, 60000);
 init();
 </script>
 </body>
