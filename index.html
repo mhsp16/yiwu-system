@@ -429,7 +429,7 @@ function esc(str) {
 const SUPABASE_URL = 'https://dmiaekaqiofyetjqbnlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtaWFla2FxaW9meWV0anFibmx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMDIyMTUsImV4cCI6MjA5ODU3ODIxNX0.skkDWY2y9y9b7RTby2sk9Adzh9P_pFyO3mgE__OrZh0';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(15000) }) }
+  global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(8000) }) }
 });
 
 // Get today's date in local timezone (YYYY-MM-DD)
@@ -935,6 +935,26 @@ function rowToRecord(row) {
 let _dataCache = null;
 let _dataCacheTime = 0;
 const DATA_CACHE_TTL = 30000; // 30秒缓存
+const CACHE_KEY_RECORDS = 'fsf_cache_records_v1';
+const CACHE_KEY_CONFIG = 'fsf_cache_config_v1';
+
+// 读取本地持久缓存(离线兜底)
+function readLocalCache() {
+  try {
+    const r = localStorage.getItem(CACHE_KEY_RECORDS);
+    const c = localStorage.getItem(CACHE_KEY_CONFIG);
+    if (r != null) {
+      return { records: JSON.parse(r), config: (c != null ? JSON.parse(c) : config) };
+    }
+  } catch (e) {}
+  return null;
+}
+function writeLocalCache() {
+  try {
+    localStorage.setItem(CACHE_KEY_RECORDS, JSON.stringify(records));
+    localStorage.setItem(CACHE_KEY_CONFIG, JSON.stringify(config));
+  } catch (e) {}
+}
 
 function showLoading(text) {
   const overlay = document.getElementById('loadingOverlay');
@@ -954,7 +974,7 @@ async function loadData(forceRefresh) {
   if (!forceRefresh && _dataCache && (now - _dataCacheTime) < DATA_CACHE_TTL) {
     records = _dataCache.records;
     config = _dataCache.config;
-        return true;
+    return true;
   }
   try {
     showLoading('正在加载数据...');
@@ -962,12 +982,10 @@ async function loadData(forceRefresh) {
       sbClient.from('records').select('id,client_id,product_name,batch_no,workshop,process,discover_time,foreign_type,discoverer,risk_level,description,source_analysis,handle_measure,handle_result,responsible,rectification,remark').order('discover_time', { ascending: false }),
       sbClient.from('config').select('data').eq('id', 1).single()
     ]);
-    
+
     if (recordsResult.error) throw recordsResult.error;
     records = (recordsResult.data || []).map(rowToRecord);
-    
 
-    
     if (configResult.error && configResult.error.code !== 'PGRST116') {
       if (configResult.error.message && !configResult.error.message.includes('No rows')) {
         console.warn('Config load warning:', configResult.error.message);
@@ -976,10 +994,11 @@ async function loadData(forceRefresh) {
     if (configResult.data && configResult.data.data) {
       config = configResult.data.data;
     }
-    
-    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)),  };
+
+    _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)) };
     _dataCacheTime = Date.now();
-    
+    writeLocalCache();
+
     return true;
   } catch (err) {
     console.error('Load data error:', err);
@@ -987,6 +1006,15 @@ async function loadData(forceRefresh) {
       records = _dataCache.records;
       config = _dataCache.config;
       toast('网络较慢，当前显示缓存数据', 'info');
+      return true;
+    }
+    const local = readLocalCache();
+    if (local) {
+      records = local.records;
+      config = local.config;
+      _dataCache = { records: [...records], config: JSON.parse(JSON.stringify(config)) };
+      _dataCacheTime = now;
+      toast('无法连接服务器，已加载本地缓存数据', 'info');
       return true;
     }
     toast('加载数据失败：' + err.message, 'error');
@@ -2669,13 +2697,14 @@ function onAnalysisFilterChange(type) {
 async function init() {
   // Ensure all overlays are hidden
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
-  
+
   updateClock();
   setInterval(updateClock, 60000);
-  
-  await loadDeletedRecords();
-  await loadOperationLogs();
-  
+
+  // 后台并行加载(不阻塞主界面,失败自动降级为空)
+  loadDeletedRecords();
+  loadOperationLogs();
+
   try {
     await loadData();
     populateMonthFilters();
